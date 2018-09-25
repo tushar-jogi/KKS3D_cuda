@@ -7,11 +7,8 @@
 #define TOLERENCE 1.0e-06
 
 __global__ void Compute_Ctotal(cuDoubleComplex *dfdphi_d, int *ny_d, 
-                              int *nz_d, double *Ctotal11, double *Ctotal12,
-                              double *Ctotal44, double *Chom11_d, 
-                              double *Chom12_d, double *Chom44_d,
-                              double *Chet11_d, double *Chet12_d,
-                              double *Chet44_d)
+                              int *nz_d, double *Ctotal, double *Chom11_d, 
+                              double *Chet11_d)
 {
 
    int i = threadIdx.x + blockDim.x*blockIdx.x;
@@ -25,9 +22,7 @@ __global__ void Compute_Ctotal(cuDoubleComplex *dfdphi_d, int *ny_d,
    e_temp = Re(dfdphi_d[idx]);
    hphi = e_temp*e_temp*e_temp*(6.0*e_temp*e_temp - 15.0*e_temp  + 10.0);
 
-   Ctotal11[idx]  =  (*Chom11_d) + (*Chet11_d*(2.0*hphi - 1.0));
-   Ctotal12[idx]  =  (*Chom12_d) + (*Chet12_d*(2.0*hphi - 1.0));
-   Ctotal44[idx]  =  (*Chom44_d) + (*Chet44_d*(2.0*hphi - 1.0));
+   Ctotal[idx]  =  (*Chom11_d) + (*Chet11_d*(2.0*hphi - 1.0));
    
 }
 
@@ -119,11 +114,10 @@ __global__ void Compute_perstr(int *ny_d, int *nz_d, double *kx_d,
    
 }
 
-__global__ void Compute_eigsts(double *Ctotal11, double *Ctotal12,
-                               double *Ctotal44, double *eigsts0,
-                               double *eigsts1, double *eigsts2,
-                               double *eigstr0, double *eigstr1,
-                               double *eigstr2, int *ny_d, int *nz_d)
+__global__ void Compute_eigsts0(double *Chom11_d, double *Chom12_d,
+                                double *Chet11_d, double *Chet12_d, 
+                                double *eigsts, double *epszero_d, 
+                                int *ny_d, int *nz_d)
 {
   int i = threadIdx.x + blockDim.x*blockIdx.x;
   int j = threadIdx.y + blockDim.y*blockIdx.y;
@@ -131,17 +125,82 @@ __global__ void Compute_eigsts(double *Ctotal11, double *Ctotal12,
 
   int idx = k + (*nz_d)*(j + i*(*ny_d));
 
-  eigsts0[idx] = Ctotal11[idx]*eigstr0[idx] + 
-                 Ctotal12[idx]*eigstr1[idx] +
-                 Ctotal12[idx]*eigstr2[idx];     
+  double hphi, e_temp, eig[3], Ct11, Ct12;
 
-  eigsts1[idx] = Ctotal12[idx]*eigstr0[idx] + 
-                 Ctotal11[idx]*eigstr1[idx] +
-                 Ctotal12[idx]*eigstr2[idx];     
+  e_temp = dfdphi_d[idx].x;
 
-  eigsts2[idx] = Ctotal12[idx]*eigstr0[idx] + 
-                 Ctotal12[idx]*eigstr1[idx] +
-                 Ctotal11[idx]*eigstr2[idx];     
+  hphi = e_temp*e_temp*e_temp*(6.0*e_temp*e_temp - 15.0*e_temp + 10.0);
+
+  eig[0] = (*epszero_d)*hphi;
+  eig[1] = (*epszero_d)*hphi;
+  eig[2] = (*epszero_d)*hphi;
+
+
+  Ct11 =  (*Chom11_d) + (*Chet11_d*(2.0*hphi - 1.0));
+  Ct12 =  (*Chom12_d) + (*Chet12_d*(2.0*hphi - 1.0));
+
+  eigsts[idx] = Ct11*eig[0] + 
+                Ct12*eig[1] +
+                Ct12*eig[2];     
+}
+
+__global__ void Compute_eigsts1(double *Chom11_d, double *Chom12_d,
+                                double *Chet11_d, double *Chet12_d, 
+                                double *eigsts, double *epszero_d, 
+                                int *ny_d, int *nz_d)
+{
+  int i = threadIdx.x + blockDim.x*blockIdx.x;
+  int j = threadIdx.y + blockDim.y*blockIdx.y;
+  int k = threadIdx.z + blockDim.z*blockIdx.z;
+
+  int idx = k + (*nz_d)*(j + i*(*ny_d));
+
+  double hphi, e_temp, eig[3], Ct11, Ct12;
+
+  e_temp = dfdphi_d[idx].x;
+
+  hphi = e_temp*e_temp*e_temp*(6.0*e_temp*e_temp - 15.0*e_temp + 10.0);
+
+  eig[0] = (*epszero_d)*hphi;
+  eig[1] = (*epszero_d)*hphi;
+  eig[2] = (*epszero_d)*hphi;
+
+
+  Ct11 =  (*Chom11_d) + (*Chet11_d*(2.0*hphi - 1.0));
+  Ct12 =  (*Chom12_d) + (*Chet12_d*(2.0*hphi - 1.0));
+
+  eigsts[idx] = Ct12*eig[0] + 
+                Ct11*eig[1] +
+                Ct12*eig[2];     
+}
+__global__ void Compute_eigsts2(double *Chom11_d, double *Chom12_d,
+                                double *Chet11_d, double *Chet12_d, 
+                                double *eigsts, double *epszero_d, 
+                                int *ny_d, int *nz_d)
+{
+  int i = threadIdx.x + blockDim.x*blockIdx.x;
+  int j = threadIdx.y + blockDim.y*blockIdx.y;
+  int k = threadIdx.z + blockDim.z*blockIdx.z;
+
+  int idx = k + (*nz_d)*(j + i*(*ny_d));
+
+  double hphi, e_temp, eig[3], Ct11, Ct12;
+
+  e_temp = dfdphi_d[idx].x;
+
+  hphi = e_temp*e_temp*e_temp*(6.0*e_temp*e_temp - 15.0*e_temp + 10.0);
+
+  eig[0] = (*epszero_d)*hphi;
+  eig[1] = (*epszero_d)*hphi;
+  eig[2] = (*epszero_d)*hphi;
+
+
+  Ct11 =  (*Chom11_d) + (*Chet11_d*(2.0*hphi - 1.0));
+  Ct12 =  (*Chom12_d) + (*Chet12_d*(2.0*hphi - 1.0));
+
+  eigsts[idx] = Ct12*eig[0] + 
+                Ct12*eig[1] +
+                Ct11*eig[2];     
 }
 
 __global__ void Compute_persts(double *Ctotal11, double *Ctotal12, 
@@ -412,10 +471,9 @@ __global__ void Compute_dfeldphi(cuDoubleComplex *str_v0_d,
                          cuDoubleComplex *str_v1_d, cuDoubleComplex *str_v2_d,
                          cuDoubleComplex *str_v3_d, cuDoubleComplex *str_v4_d,
                          cuDoubleComplex *str_v5_d, cuDoubleComplex *dfdphi_d,
-                         cuDoubleComplex *dfeldphi_d, double *Ctotal11,
-                         double *Ctotal12, double *Ctotal44, double *Chet11_d,
-                         double *Chet12_d, double *Chet44_d, double *eigstr0, 
-                         double *eigstr1, double *eigstr2, 
+                         cuDoubleComplex *dfeldphi_d, double *Chom11_d,
+                         double *Chom12_d, double *Chom44_d, double *Chet11_d,
+                         double *Chet12_d, double *Chet44_d,  
                          double *hom_strain_v, double *epszero_d,
                          int *ny_d, int *nz_d)
 {
@@ -541,7 +599,7 @@ void InhomElast (void){
   void             *t_storage = NULL;
   size_t           t_storage_bytes = 0;
 
-  cub::DeviceReduce::Sum(t_storage, t_storage_bytes, Ctotal11,
+  cub::DeviceReduce::Sum(t_storage, t_storage_bytes, Ctotal,
                          Cavg11, nx*ny*nz);
 
   complex_size = nx*ny*nz*sizeof(cuDoubleComplex);
@@ -555,7 +613,7 @@ void InhomElast (void){
   checkCudaErrors(cudaMalloc((void**)&str_v3_d, complex_size));
   checkCudaErrors(cudaMalloc((void**)&str_v4_d, complex_size));
   checkCudaErrors(cudaMalloc((void**)&str_v5_d, complex_size));
-  checkCudaErrors(cudaMalloc((void**)&totalstr_d, complex_size));
+  //checkCudaErrors(cudaMalloc((void**)&totalstr_d, complex_size));
 
   checkCudaErrors(cudaMalloc((void**)&unewx_d, complex_size));
   checkCudaErrors(cudaMalloc((void**)&unewy_d, complex_size));
@@ -568,13 +626,13 @@ void InhomElast (void){
   checkCudaErrors(cudaMalloc((void**)&ts4_d, complex_size));
   checkCudaErrors(cudaMalloc((void**)&ts5_d, complex_size));
 
-  checkCudaErrors(cudaMalloc((void**)&Cinhom11, double_size)); 
-  checkCudaErrors(cudaMalloc((void**)&Cinhom12, double_size)); 
-  checkCudaErrors(cudaMalloc((void**)&Cinhom44, double_size)); 
+  //checkCudaErrors(cudaMalloc((void**)&Cinhom11, double_size)); 
+  //checkCudaErrors(cudaMalloc((void**)&Cinhom12, double_size)); 
+  //checkCudaErrors(cudaMalloc((void**)&Cinhom44, double_size)); 
 
-  checkCudaErrors(cudaMalloc((void**)&Ctotal11, double_size)); 
-  checkCudaErrors(cudaMalloc((void**)&Ctotal12, double_size)); 
-  checkCudaErrors(cudaMalloc((void**)&Ctotal44, double_size)); 
+  checkCudaErrors(cudaMalloc((void**)&Ctotal, double_size)); 
+//  checkCudaErrors(cudaMalloc((void**)&Ctotal12, double_size)); 
+//  checkCudaErrors(cudaMalloc((void**)&Ctotal44, double_size)); 
 
   checkCudaErrors(cudaMalloc((void**)&Cavg11, sizeof(double))); 
   checkCudaErrors(cudaMalloc((void**)&Cavg12, sizeof(double))); 
@@ -591,13 +649,13 @@ void InhomElast (void){
   checkCudaErrors(cudaMalloc((void**)&avgpersts4, sizeof(double))); 
   checkCudaErrors(cudaMalloc((void**)&avgpersts5, sizeof(double))); 
 
-  checkCudaErrors(cudaMalloc((void**)&eigstr0, double_size));
-  checkCudaErrors(cudaMalloc((void**)&eigstr1, double_size));
-  checkCudaErrors(cudaMalloc((void**)&eigstr2, double_size));
+  //checkCudaErrors(cudaMalloc((void**)&eigstr0, double_size));
+  //checkCudaErrors(cudaMalloc((void**)&eigstr1, double_size));
+  //checkCudaErrors(cudaMalloc((void**)&eigstr2, double_size));
 
-  checkCudaErrors(cudaMalloc((void**)&eigsts0, double_size));
-  checkCudaErrors(cudaMalloc((void**)&eigsts1, double_size));
-  checkCudaErrors(cudaMalloc((void**)&eigsts2, double_size));
+  checkCudaErrors(cudaMalloc((void**)&eigsts, double_size));
+  //checkCudaErrors(cudaMalloc((void**)&eigsts1, double_size));
+  //checkCudaErrors(cudaMalloc((void**)&eigsts2, double_size));
 
   checkCudaErrors(cudaMalloc((void**)&persts0, double_size));
   checkCudaErrors(cudaMalloc((void**)&persts1, double_size));
@@ -612,24 +670,36 @@ void InhomElast (void){
   checkCudaErrors(cudaMalloc(&t_storage, t_storage_bytes));
 
  /*----------------------------------------------------------------------
-  *     Defining total elastic constants in Voight's form
+  *     Defining total elastic constants and average elastic constants 
+  *     in Voight's form
   *----------------------------------------------------------------------*/
 
-  Compute_Ctotal<<< Gridsize, Blocksize >>>(dfdphi_d, ny_d, nz_d, 
-                                            Ctotal11, Ctotal12, Ctotal44, 
-                                            Chom11_d, Chom12_d, Chom44_d, 
-                                            Chet11_d, Chet12_d, Chet44_d);
+  Compute_Ctotal<<< Gridsize, Blocksize>>>(dfdphi_d, ny_d, nz_d, Ctotal, Chom11_d,
+  cub::DeviceReduce::Sum(t_storage, t_storage_bytes, Ctotal,
+                         Cavg11, nx*ny*nz);
+  Compute_Ctotal<<< Gridsize, Blocksize>>>(dfdphi_d, ny_d, nz_d, Ctotal, Chom12_d,
+                                           Chet12_d);
+  cub::DeviceReduce::Sum(t_storage, t_storage_bytes, Ctotal,
+                         Cavg12, nx*ny*nz);
+  Compute_Ctotal<<< Gridsize, Blocksize>>>(dfdphi_d, ny_d, nz_d, Ctotal, Chom44_d,
+                                           Chet44_d);
+  cub::DeviceReduce::Sum(t_storage, t_storage_bytes, Ctotal,
+                         Cavg44, nx*ny*nz);
+  //Compute_Ctotal<<< Gridsize, Blocksize >>>(dfdphi_d, ny_d, nz_d, 
+  //                                          Ctotal, Ctotal12, Ctotal44, 
+  //                                          Chom11_d, Chom12_d, Chom44_d, 
+  //                                          Chet11_d, Chet12_d, Chet44_d);
 
  /*-----------------------------------------------------------------------
   *    Defining average elastic constants tensor in Voight's form
   *---------------------------------------------------------------------*/
-  cub::DeviceReduce::Sum(t_storage, t_storage_bytes, Ctotal11,
-                         Cavg11, nx*ny*nz);
-  cub::DeviceReduce::Sum(t_storage, t_storage_bytes, Ctotal12, 
+  ///////////////////////////////////////////////////////////////////////
+  /*cub::DeviceReduce::Sum(t_storage, t_storage_bytes, Ctotal12, 
                  	 Cavg12, nx*ny*nz);
   cub::DeviceReduce::Sum(t_storage, t_storage_bytes, Ctotal44, 
 			 Cavg44, nx*ny*nz);
-
+  */
+  ///////////////////////////////////////////////////////////////////////
   Average<<<1,1>>>(Cavg11, sizescale_d); 
   Average<<<1,1>>>(Cavg12, sizescale_d); 
   Average<<<1,1>>>(Cavg44, sizescale_d); 
@@ -641,26 +711,32 @@ void InhomElast (void){
 
  /*Inhomogenous part of total stiffness tensor in Voight's form*/ 
 
-  Compute_Cinhom<<<Gridsize, Blocksize>>>(Cinhom11, Cinhom12, Cinhom44, 
+  /*Compute_Cinhom<<<Gridsize, Blocksize>>>(Cinhom11, Cinhom12, Cinhom44, 
                                           Ctotal11, Ctotal12, Ctotal44,
                                           Chom11_d, Chom12_d, Chom44_d, 
-                                          ny_d, nz_d);
+  */                                        ny_d, nz_d);
   //Finding eigen strain
-  Compute_eigstr<<<Gridsize, Blocksize>>>(dfdphi_d, eigstr0, eigstr1, 
+  /*Compute_eigstr<<<Gridsize, Blocksize>>>(dfdphi_d, eigstr0, eigstr1, 
                                           eigstr2, epszero_d, ny_d, nz_d);
+  */
   //Finding eigen stress
-  Compute_eigsts<<<Gridsize, Blocksize>>>(Ctotal11, Ctotal12, Ctotal44, 
-                                          eigsts0, eigsts1, eigsts2, 
-                                          eigstr0, eigstr1, eigstr2,
-                                          ny_d, nz_d);
-
-  //Finding average eigen stress
-  cub::DeviceReduce::Sum(t_storage, t_storage_bytes, eigsts0, 
+  Compute_eigsts0<<<Gridsize, Blocksize>>>(Chom11_d, Chom12_d, Chet11_d, Chet12_d, 
+                                          eigsts, ny_d, nz_d);
+  cub::DeviceReduce::Sum(t_storage, t_storage_bytes, eigsts, 
 			 avgeigsts0, nx*ny*nz);
-  cub::DeviceReduce::Sum(t_storage, t_storage_bytes, eigsts1, 
+  Compute_eigsts1<<<Gridsize, Blocksize>>>(Chom11_d, Chom12_d, Chet11_d, Chet12_d, 
+                                          eigsts, ny_d, nz_d);
+  cub::DeviceReduce::Sum(t_storage, t_storage_bytes, eigsts, 
 			 avgeigsts1, nx*ny*nz);
-  cub::DeviceReduce::Sum(t_storage, t_storage_bytes, eigsts2, 
+  Compute_eigsts2<<<Gridsize, Blocksize>>>(Chom11_d, Chom12_d, Chet11_d, Chet12_d, 
+                                          eigsts, ny_d, nz_d);
+  cub::DeviceReduce::Sum(t_storage, t_storage_bytes, eigsts, 
 			 avgeigsts2, nx*ny*nz);
+  //Finding average eigen stress
+  //cub::DeviceReduce::Sum(t_storage, t_storage_bytes, eigsts1, 
+  //			 avgeigsts1, nx*ny*nz);
+  //cub::DeviceReduce::Sum(t_storage, t_storage_bytes, eigsts2, 
+  //			 avgeigsts2, nx*ny*nz);
 
   Average<<<1,1>>>(avgeigsts0, sizescale_d); 
   Average<<<1,1>>>(avgeigsts1, sizescale_d); 
