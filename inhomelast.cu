@@ -1,7 +1,8 @@
 /**************************************************************************
 
-  Interpolation = 1 : elastic constants as function of composition
-  Interpolation = 2 : elastic constants as function of phi 
+   last update: Memory is reduced by computing Ctotal, Cinhom and
+                eigenstrain on the fly.
+   Date: 24/09/2018 
 
 ************************************************************************/
 #define TOLERENCE 1.0e-06
