@@ -405,12 +405,6 @@ void Evolve(void)
   free(ky);
   free(kz);
 
-  checkCudaErrors(cudaMalloc((void**)&gradphix_d, complex_size));
-  checkCudaErrors(cudaMalloc((void**)&gradphiy_d, complex_size));
-  checkCudaErrors(cudaMalloc((void**)&gradphiz_d, complex_size));
-  checkCudaErrors(cudaMalloc((void**)&varmobx_d, complex_size));
-  checkCudaErrors(cudaMalloc((void**)&varmoby_d, complex_size));
-  checkCudaErrors(cudaMalloc((void**)&varmobz_d, complex_size));
 
   if (elast_int == 1)
     ComputeGreentensor<<< Gridsize, Blocksize >>>(kx_d, ky_d, kz_d, Chom11_d, 
@@ -483,11 +477,14 @@ void Evolve(void)
        // HomElast();
     }
 
+    checkCudaErrors(cudaMalloc((void**)&gradphix_d, complex_size));
+    checkCudaErrors(cudaMalloc((void**)&gradphiy_d, complex_size));
+    checkCudaErrors(cudaMalloc((void**)&gradphiz_d, complex_size));
 
     ComputeGradphi<<< Gridsize, Blocksize >>>(kx_d, ky_d, kz_d, 
-                                            nx_d, ny_d, nz_d, 
-                                            phi_d, gradphix_d, gradphiy_d, 
-                                            gradphiz_d);
+                                              nx_d, ny_d, nz_d, 
+                                              phi_d, gradphix_d, gradphiy_d, 
+                                              gradphiz_d);
 
     cufftExecZ2Z(plan, gradphix_d, gradphix_d, CUFFT_INVERSE);
     cufftExecZ2Z(plan, gradphiy_d, gradphiy_d, CUFFT_INVERSE);
@@ -497,11 +494,16 @@ void Evolve(void)
     Normalize<<< Gridsize, Blocksize >>>(gradphiy_d, sizescale_d, ny_d, nz_d);
     Normalize<<< Gridsize, Blocksize >>>(gradphiz_d, sizescale_d, ny_d, nz_d);
 
+    checkCudaErrors(cudaMalloc((void**)&varmobx_d, complex_size));
+    checkCudaErrors(cudaMalloc((void**)&varmoby_d, complex_size));
+    checkCudaErrors(cudaMalloc((void**)&varmobz_d, complex_size));
+    
     ComputeDrivForce<<< Gridsize, Blocksize >>>(comp_d, dfdphi_d, 
-                                gradphix_d, gradphiy_d, gradphiz_d, 
-                                varmobx_d, varmoby_d, varmobz_d, 
-                                f0AVminv_d, f0BVminv_d, c_beta_eq_d, 
-                                c_alpha_eq_d, diffusivity_d, w_d, ny_d, nz_d);
+                                                gradphix_d, gradphiy_d, gradphiz_d, 
+                                                varmobx_d, varmoby_d, varmobz_d, 
+                                                f0AVminv_d, f0BVminv_d, c_beta_eq_d, 
+                                                c_alpha_eq_d, diffusivity_d, 
+                                                w_d, ny_d, nz_d);
 
     if (cufftExecZ2Z(plan,varmobx_d, varmobx_d,CUFFT_FORWARD) != CUFFT_SUCCESS)
        printf("fft failed\n");
@@ -510,14 +512,21 @@ void Evolve(void)
     if (cufftExecZ2Z(plan,varmobz_d, varmobz_d,CUFFT_FORWARD) != CUFFT_SUCCESS)
        printf("fft failed\n");
 
+    cudaFree(gradphix_d);
+    cudaFree(gradphiy_d);
+    cudaFree(gradphiz_d);
+    
     ComputeDfdc<<< Gridsize, Blocksize >>>(dfdc_d, varmobx_d, varmoby_d,
                                            varmobz_d, nx_d, ny_d, nz_d, 
                                            kx_d, ky_d, kz_d);
 
-
     cufftExecZ2Z(plan, comp_d,     comp_d, CUFFT_FORWARD);
     cufftExecZ2Z(plan, dfdphi_d, dfdphi_d, CUFFT_FORWARD);
 
+    cudaFree(varmobx_d);
+    cudaFree(varmoby_d);
+    cudaFree(varmobz_d);
+    
     if (elast_int == 1 && count > time_elast)
       cufftExecZ2Z(plan, dfeldphi_d, dfeldphi_d, CUFFT_FORWARD);
     
@@ -537,8 +546,9 @@ void Evolve(void)
 
     cudaMemcpy(&comp_at_corner,comp_d,sizeof(cufftDoubleComplex),
                 cudaMemcpyDeviceToHost);
+
     printf("comp_at_corner = %lf\n", Re(comp_at_corner));
-    if (fabs(Re(comp_at_corner) - c0) >= 1.0e-04)
+    if (fabs(Re(comp_at_corner) - c0) >= 1.0e-02)
     {
 	printf("Growth condition has vanished!!!!\n");
         exit(0);
@@ -575,12 +585,6 @@ void Evolve(void)
   cudaFree(S11_d);
   cudaFree(S12_d);
   cudaFree(S44_d);
-  cudaFree(varmobx_d);
-  cudaFree(varmoby_d);
-  cudaFree(varmobz_d);
-  cudaFree(gradphix_d);
-  cudaFree(gradphiy_d);
-  cudaFree(gradphiz_d);
 }
 
 #include "out_conf.cu"
