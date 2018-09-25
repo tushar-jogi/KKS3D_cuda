@@ -143,7 +143,7 @@ __global__ void Compute_eigsts0(double *Chom11_d, double *Chom12_d,
   eigsts[idx] = Ct11*eig[0] + 
                 Ct12*eig[1] +
                 Ct12*eig[2];     
-  __syncthreads();     
+  //__syncthreads();     
 }
 
 __global__ void Compute_eigsts1(double *Chom11_d, double *Chom12_d,
@@ -174,7 +174,7 @@ __global__ void Compute_eigsts1(double *Chom11_d, double *Chom12_d,
   eigsts[idx] = Ct12*eig[0] + 
                 Ct11*eig[1] +
                 Ct12*eig[2];     
-  __syncthreads();     
+  //__syncthreads();     
 }
 __global__ void Compute_eigsts2(double *Chom11_d, double *Chom12_d,
                                 double *Chet11_d, double *Chet12_d, 
@@ -204,13 +204,13 @@ __global__ void Compute_eigsts2(double *Chom11_d, double *Chom12_d,
   eigsts[idx] = Ct12*eig[0] + 
                 Ct12*eig[1] +
                 Ct11*eig[2];     
-  __syncthreads();     
+  //__syncthreads();     
 }
 
 __global__ void Compute_persts0(double *Chom11_d, double *Chom12_d, 
-                     double *Chet11_d, double *Chet12_d, cuDoubleComplex *dfdphi_d, 
-                     cuDoubleComplex *str_v0_d, cuDoubleComplex *str_v1_d, 
-                     cuDoubleComplex *str_v2_d, double *persts, int *ny_d, int *nz_d)
+                double *Chet11_d, double *Chet12_d, cuDoubleComplex *dfdphi_d, 
+                cuDoubleComplex *str_v0_d, cuDoubleComplex *str_v1_d, 
+                cuDoubleComplex *str_v2_d, double *persts, int *ny_d, int *nz_d)
 {
    	 
   int i = threadIdx.x + blockDim.x*blockIdx.x;
@@ -237,12 +237,12 @@ __global__ void Compute_persts0(double *Chom11_d, double *Chom12_d,
                 Ct12*str_v[1] +
                 Ct12*str_v[2];
 
-  __syncthreads();     
+  //__syncthreads();     
 }
 __global__ void Compute_persts1(double *Chom11_d, double *Chom12_d, 
-                     double *Chet11_d, double *Chet12_d, cuDoubleComplex *dfdphi_d, 
-                     cuDoubleComplex *str_v0_d, cuDoubleComplex *str_v1_d, 
-                     cuDoubleComplex *str_v2_d, double *persts, int *ny_d, int *nz_d)
+                double *Chet11_d, double *Chet12_d, cuDoubleComplex *dfdphi_d, 
+                cuDoubleComplex *str_v0_d, cuDoubleComplex *str_v1_d, 
+                cuDoubleComplex *str_v2_d, double *persts, int *ny_d, int *nz_d)
 {
    	 
   int i = threadIdx.x + blockDim.x*blockIdx.x;
@@ -268,12 +268,12 @@ __global__ void Compute_persts1(double *Chom11_d, double *Chom12_d,
   persts[idx] = Ct12*str_v[0] + 
                 Ct11*str_v[1] +
                 Ct12*str_v[2];     
-  __syncthreads();     
+  //__syncthreads();     
 }
 __global__ void Compute_persts2(double *Chom11_d, double *Chom12_d, 
-                     double *Chet11_d, double *Chet12_d, cuDoubleComplex *dfdphi_d, 
-                     cuDoubleComplex *str_v0_d, cuDoubleComplex *str_v1_d, 
-                     cuDoubleComplex *str_v2_d, double *persts, int *ny_d, int *nz_d)
+                double *Chet11_d, double *Chet12_d, cuDoubleComplex *dfdphi_d, 
+                cuDoubleComplex *str_v0_d, cuDoubleComplex *str_v1_d, 
+                cuDoubleComplex *str_v2_d, double *persts, int *ny_d, int *nz_d)
 {
    	 
   int i = threadIdx.x + blockDim.x*blockIdx.x;
@@ -299,7 +299,7 @@ __global__ void Compute_persts2(double *Chom11_d, double *Chom12_d,
   persts[idx] = Ct12*str_v[0] + 
                 Ct12*str_v[1] +
                 Ct11*str_v[2];     
-  __syncthreads();     
+  //__syncthreads();     
 }
 __global__ void Compute_persts3(double *Chom44_d, double *Chet44_d, 
                      cuDoubleComplex *dfdphi_d, cuDoubleComplex *str_v3_d, 
@@ -325,7 +325,7 @@ __global__ void Compute_persts3(double *Chom44_d, double *Chet44_d,
 
   persts[idx] = Ct44*str_v;
 
-  __syncthreads(); 
+  //__syncthreads(); 
 }
 __global__ void Compute_persts4(double *Chom44_d, double *Chet44_d, 
                      cuDoubleComplex *dfdphi_d, cuDoubleComplex *str_v4_d, 
@@ -349,7 +349,7 @@ __global__ void Compute_persts4(double *Chom44_d, double *Chet44_d,
   Ct44 =  (*Chom44_d) + (*Chet44_d*(2.0*hphi - 1.0));
 
   persts[idx] = Ct44*str_v ; 
-  __syncthreads(); 
+  //__syncthreads(); 
 }
 __global__ void Compute_persts5(double *Chom44_d, double *Chet44_d, 
                      cuDoubleComplex *dfdphi_d, cuDoubleComplex *str_v5_d, 
@@ -374,7 +374,7 @@ __global__ void Compute_persts5(double *Chom44_d, double *Chet44_d,
   Ct44 =  (*Chom44_d) + (*Chet44_d*(2.0*hphi - 1.0));
 
   persts[idx] = Ct44*str_v ; 
-  __syncthreads(); 
+  //__syncthreads(); 
 }
 
 __global__ void Compute_homstr(double *hom_strain_v, double *S11_d, 
