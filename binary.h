@@ -45,7 +45,7 @@ cuDoubleComplex *varmobx_d, *varmoby_d, *varmobz_d;
 cuDoubleComplex *gradphix_d, *gradphiy_d, *gradphiz_d;
 
 //FFT Handle
-cufftHandle  plan;
+cufftHandle  plan, elast_plan;
 //cublas handle
 cublasHandle_t blas_handle;
 //total number of simulation steps
@@ -92,35 +92,35 @@ FILE       *fpout;
 double     dkx, dky, dkz;
 double     *kx, *ky, *kz;
 double     *kx_d, *ky_d, *kz_d;
-double     epszero, *epszero_d;
+float     epszero, *epszero_d;
 double     sizescale, *sizescale_d;
-double     sigappl_v[6], *sigappl_v_d;
-double     disperror;
+float     sigappl_v[6], *sigappl_v_d;
+float     disperror;
 double     mu_m, nu_m, Az_m;
 double     mu_p, nu_p, Az_p;
-double     Cp[6][6], Cm[6][6];
-double     Chom11, Chom12, Chom44; 
-double     *Chom11_d, *Chom12_d, *Chom44_d; 
-double     Chet11, Chet12, Chet44;
-double     *Chet11_d, *Chet12_d, *Chet44_d;
-double     *S11_d, *S12_d, *S44_d;
-double     S11, S12, S44;
-double     *Ctotal, *Ctotal12, *Ctotal44;
-double     *Cinhom11, *Cinhom12, *Cinhom44;
-double     *eigstr0, *eigstr1, *eigstr2;
-double     *eigsts, *eigsts1, *eigsts2;
-double     *persts, *persts1, *persts2; 
-double     *persts3, *persts4, *persts5;
-double     *omega_v0, *omega_v1, *omega_v2;
-double     *omega_v3, *omega_v4, *omega_v5;
+float     Cp[6][6], Cm[6][6];
+float     Chom11, Chom12, Chom44; 
+float     *Chom11_d, *Chom12_d, *Chom44_d; 
+float     Chet11, Chet12, Chet44;
+float     *Chet11_d, *Chet12_d, *Chet44_d;
+float     *S11_d, *S12_d, *S44_d;
+float     S11, S12, S44;
+float     *Ctotal, *Ctotal12, *Ctotal44;
+float     *Cinhom11, *Cinhom12, *Cinhom44;
+float     *eigstr0, *eigstr1, *eigstr2;
+float     *eigsts, *eigsts1, *eigsts2;
+float     *persts, *persts1, *persts2; 
+float     *persts3, *persts4, *persts5;
+float     *omega_v0, *omega_v1, *omega_v2;
+float     *omega_v3, *omega_v4, *omega_v5;
                           
-cuDoubleComplex *ux_d,*uy_d,*uz_d;
-cuDoubleComplex *unewx_d,*unewy_d,*unewz_d;
-cuDoubleComplex *str_v0_d, *str_v1_d, *str_v2_d, 
-                *str_v3_d, *str_v4_d, *str_v5_d;
-cuDoubleComplex *eigsts00, *eigsts10, *eigsts20;
-cuDoubleComplex *ts0_d, *ts1_d, *ts2_d, 
-                *ts3_d, *ts4_d, *ts5_d;
+cufftComplex *ux_d,*uy_d,*uz_d;
+cufftComplex *unewx_d,*unewy_d,*unewz_d;
+cufftComplex *str_v0_d, *str_v1_d, *str_v2_d, 
+             *str_v3_d, *str_v4_d, *str_v5_d;
+cufftComplex *eigsts00, *eigsts10, *eigsts20;
+cufftComplex *ts0_d, *ts1_d, *ts2_d, 
+             *ts3_d, *ts4_d, *ts5_d;
 
 int calc_interface_energy, create_nuclei;
 

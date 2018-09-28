@@ -1,9 +1,9 @@
 
 __global__ void ComputeGreentensor(double *kx_d, double *ky_d, double *kz_d, 
-                          double *Chom11_d, double *Chom12_d, double *Chom44_d,
-                          int *nx_d, int *ny_d, int *nz_d, double *omega_v0,
-                          double *omega_v1, double *omega_v2, double *omega_v3,
-                          double *omega_v4, double *omega_v5)
+                          float *Chom11_d, float *Chom12_d, float *Chom44_d,
+                          int *nx_d, int *ny_d, int *nz_d, float *omega_v0,
+                          float *omega_v1, float *omega_v2, float *omega_v3,
+                          float *omega_v4, float *omega_v5)
 {
 
   int i = threadIdx.x + blockIdx.x*blockDim.x;
@@ -12,11 +12,12 @@ __global__ void ComputeGreentensor(double *kx_d, double *ky_d, double *kz_d,
 
   int idx = k +(*nz_d)*(j + i*(*ny_d));
 
-  double  adjomega[6], det_omega, invomega_v[6], n[3];
+  float  adjomega[6], det_omega, invomega_v[6];
+  float  n[3];
       
-  n[0] = kx_d[i];
-  n[1] = ky_d[j];
-  n[2] = kz_d[k];
+  n[0] = (float)kx_d[i];
+  n[1] = (float)ky_d[j];
+  n[2] = (float)kz_d[k];
 
   invomega_v[0] = (*Chom11_d)*n[0]*n[0] + (*Chom44_d)*n[1]*n[1] +
                   (*Chom44_d)*n[2]*n[2];
@@ -271,6 +272,20 @@ __global__ void Update_comp_phi (cuDoubleComplex *comp_d,
 
 }
 
+__global__ void Normalize_elast(cufftComplex *x, double *sizescale_d, int *ny_d,
+                          int *nz_d)
+{
+
+  int i = threadIdx.x + blockIdx.x*blockDim.x;
+  int j = threadIdx.y + blockIdx.y*blockDim.y;
+  int k = threadIdx.z + blockIdx.z*blockDim.z;
+
+  int idx = k + (*nz_d)*(j + i*(*ny_d));
+ 
+  x[idx].x = (float)(x[idx].x * (*sizescale_d));
+  x[idx].y = (float)(x[idx].y * (*sizescale_d));
+
+}
 __global__ void Normalize(cuDoubleComplex *x, double *sizescale_d, int *ny_d,
                           int *nz_d)
 {
@@ -547,7 +562,7 @@ void Evolve(void)
     cudaMemcpy(&comp_at_corner,comp_d,sizeof(cufftDoubleComplex),
                 cudaMemcpyDeviceToHost);
 
-    printf("comp_at_corner = %lf\n", Re(comp_at_corner));
+    //printf("comp_at_corner = %lf\n", Re(comp_at_corner));
     if (fabs(Re(comp_at_corner) - c0) >= 1.0e-02)
     {
 	printf("Growth condition has vanished!!!!\n");

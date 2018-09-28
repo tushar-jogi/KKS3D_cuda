@@ -7,7 +7,7 @@ int main (void)
     void Init_Conf ();
     void Evolve ();
 
-    size_t  complex_size, double_size;
+    size_t  complex_size, double_size, float_size, complex_size_elast;
     char finput[15] = "bin1ary";
     char fnin[30], fnout[30];
     FILE *fp;
@@ -48,15 +48,15 @@ int main (void)
     checkCudaErrors( cudaMalloc((void**)&ppt_size_d, sizeof(double)));
     checkCudaErrors( cudaMalloc((void**)&c_beta_eq_d, sizeof(double)));
     checkCudaErrors( cudaMalloc((void**)&c_alpha_eq_d, sizeof(double)));
-    checkCudaErrors( cudaMalloc((void**)&epszero_d, sizeof(double)));
+    checkCudaErrors( cudaMalloc((void**)&epszero_d, sizeof(float)));
     checkCudaErrors( cudaMalloc((void**)&sizescale_d, sizeof(double)));
-    checkCudaErrors( cudaMalloc((void**)&Chom11_d, sizeof(double)));
-    checkCudaErrors( cudaMalloc((void**)&Chom12_d, sizeof(double)));
-    checkCudaErrors( cudaMalloc((void**)&Chom44_d, sizeof(double)));
-    checkCudaErrors( cudaMalloc((void**)&Chet11_d, sizeof(double)));
-    checkCudaErrors( cudaMalloc((void**)&Chet12_d, sizeof(double)));
-    checkCudaErrors( cudaMalloc((void**)&Chet44_d, sizeof(double)));
-    checkCudaErrors( cudaMalloc((void**)&sigappl_v_d, 6*sizeof(double)));
+    checkCudaErrors( cudaMalloc((void**)&Chom11_d, sizeof(float)));
+    checkCudaErrors( cudaMalloc((void**)&Chom12_d, sizeof(float)));
+    checkCudaErrors( cudaMalloc((void**)&Chom44_d, sizeof(float)));
+    checkCudaErrors( cudaMalloc((void**)&Chet11_d, sizeof(float)));
+    checkCudaErrors( cudaMalloc((void**)&Chet12_d, sizeof(float)));
+    checkCudaErrors( cudaMalloc((void**)&Chet44_d, sizeof(float)));
+    checkCudaErrors( cudaMalloc((void**)&sigappl_v_d, 6*sizeof(float)));
 
     checkCudaErrors(cudaMemcpy(nx_d, &nx, sizeof(int),
           cudaMemcpyHostToDevice));
@@ -80,14 +80,16 @@ int main (void)
           cudaMemcpyHostToDevice));
     checkCudaErrors(cudaMemcpy(c_alpha_eq_d, &c_alpha_eq, sizeof(double),
           cudaMemcpyHostToDevice));
-    checkCudaErrors(cudaMemcpy(sigappl_v_d, sigappl_v, 6*sizeof(double),
+    checkCudaErrors(cudaMemcpy(sigappl_v_d, sigappl_v, 6*sizeof(float),
           cudaMemcpyHostToDevice));
-    checkCudaErrors(cudaMemcpy(epszero_d, &epszero, sizeof(double),
+    checkCudaErrors(cudaMemcpy(epszero_d, &epszero, sizeof(float),
           cudaMemcpyHostToDevice));
 
     //sizes of complex and double variables
     complex_size = nx*ny*nz*sizeof(cuDoubleComplex);
+    complex_size_elast = nx*ny*nz*sizeof(cufftComplex);
     double_size  = nx*ny*nz*sizeof(double);
+    float_size   = nx*ny*nz*sizeof(float);
 
 
     //Allocation of global variables
@@ -102,16 +104,16 @@ int main (void)
     //Allocation of elasticity varaibles
     if (elast_int == 1){
 
-      checkCudaErrors(cudaMalloc((void**)&ux_d, complex_size));
-      checkCudaErrors(cudaMalloc((void**)&uy_d, complex_size));
-      checkCudaErrors(cudaMalloc((void**)&uz_d, complex_size));
+      checkCudaErrors(cudaMalloc((void**)&ux_d, complex_size_elast));
+      checkCudaErrors(cudaMalloc((void**)&uy_d, complex_size_elast));
+      checkCudaErrors(cudaMalloc((void**)&uz_d, complex_size_elast));
       checkCudaErrors(cudaMalloc((void**)&dfeldphi_d,complex_size));
-      checkCudaErrors(cudaMalloc((void**)&omega_v0, double_size));
-      checkCudaErrors(cudaMalloc((void**)&omega_v1, double_size));
-      checkCudaErrors(cudaMalloc((void**)&omega_v2, double_size));
-      checkCudaErrors(cudaMalloc((void**)&omega_v3, double_size));
-      checkCudaErrors(cudaMalloc((void**)&omega_v4, double_size));
-      checkCudaErrors(cudaMalloc((void**)&omega_v5, double_size));
+      checkCudaErrors(cudaMalloc((void**)&omega_v0, float_size));
+      checkCudaErrors(cudaMalloc((void**)&omega_v1, float_size));
+      checkCudaErrors(cudaMalloc((void**)&omega_v2, float_size));
+      checkCudaErrors(cudaMalloc((void**)&omega_v3, float_size));
+      checkCudaErrors(cudaMalloc((void**)&omega_v4, float_size));
+      checkCudaErrors(cudaMalloc((void**)&omega_v5, float_size));
 
     }
 
@@ -139,6 +141,7 @@ int main (void)
 
     //Declaring fft plan
     cufftPlan3d(&plan, nx, ny, nz, CUFFT_Z2Z); 
+    cufftPlan3d(&elast_plan, nx, ny, nz, CUFFT_C2C); 
 
     cudaDeviceSynchronize();
     //call to evolve

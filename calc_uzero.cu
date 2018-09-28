@@ -1,7 +1,7 @@
 
-__global__ void Compute_eigstr(cuDoubleComplex *dfdphi_d, double *eigstr0,
-                               double *eigstr1, double *eigstr2, 
-                               double *epszero_d, int *ny_d, int *nz_d)
+__global__ void Compute_eigstr(cuDoubleComplex *dfdphi_d, float *eigstr0,
+                               float *eigstr1, float *eigstr2, 
+                               float *epszero_d, int *ny_d, int *nz_d)
 {
 
   int i = threadIdx.x + blockDim.x*blockIdx.x;
@@ -10,7 +10,7 @@ __global__ void Compute_eigstr(cuDoubleComplex *dfdphi_d, double *eigstr0,
 
   int idx = k + (*nz_d)*(j + i*(*ny_d));
 
-  double hphi, e_temp;
+  float hphi, e_temp;
 
   e_temp = dfdphi_d[idx].x;
 
@@ -22,10 +22,10 @@ __global__ void Compute_eigstr(cuDoubleComplex *dfdphi_d, double *eigstr0,
 
 }
  
-__global__ void Compute_eigsts_hom(cuDoubleComplex *eigsts00, 
-                        cuDoubleComplex *eigsts10, cuDoubleComplex *eigsts20, 
-                        double *eigstr0, double *eigstr1, double *eigstr2, 
-                        double *Chom11_d, double *Chom12_d, double *Chom44_d,
+__global__ void Compute_eigsts_hom(cufftComplex *eigsts00, 
+                        cufftComplex *eigsts10, cufftComplex *eigsts20, 
+                        float *eigstr0, float *eigstr1, float *eigstr2, 
+                        float *Chom11_d, float *Chom12_d, float *Chom44_d,
                         int *ny_d, int *nz_d)
 {
 
@@ -53,8 +53,8 @@ __global__ void Compute_eigsts_hom(cuDoubleComplex *eigsts00,
 
 }
 
-__global__ void Initialize_disp(cuDoubleComplex *ux_d, cuDoubleComplex *uy_d,
-                                cuDoubleComplex *uz_d, int *ny_d, int *nz_d)
+__global__ void Initialize_disp(cufftComplex *ux_d, cufftComplex *uy_d,
+                                cufftComplex *uz_d, int *ny_d, int *nz_d)
 {
 
   int i = threadIdx.x + blockDim.x*blockIdx.x;
@@ -74,12 +74,12 @@ __global__ void Initialize_disp(cuDoubleComplex *ux_d, cuDoubleComplex *uy_d,
 }
 
 __global__ void Compute_uzero(int *ny_d, int *nz_d, 
-                          cuDoubleComplex *ux_d, cuDoubleComplex *uy_d,
-                          cuDoubleComplex *uz_d, double *kx_d, double *ky_d,
-                          double *kz_d, double *omega_v0, double *omega_v1,
-                          double *omega_v2, double *omega_v3, double *omega_v4, 
-                          double *omega_v5, cuDoubleComplex *eigsts00, 
-                          cuDoubleComplex *eigsts10, cuDoubleComplex *eigsts20)
+                          cufftComplex *ux_d, cufftComplex *uy_d,
+                          cufftComplex *uz_d, double *kx_d, double *ky_d,
+                          double *kz_d, float *omega_v0, float *omega_v1,
+                          float *omega_v2, float *omega_v3, float *omega_v4, 
+                          float *omega_v5, cufftComplex *eigsts00, 
+                          cufftComplex *eigsts10, cufftComplex *eigsts20)
 {
 
   int i = threadIdx.x + blockDim.x*blockIdx.x;
@@ -88,12 +88,13 @@ __global__ void Compute_uzero(int *ny_d, int *nz_d,
 
   int idx = k + (*nz_d)*(j + i*(*ny_d));
 
-  double           nk[3], omega[6];
-  cuDoubleComplex  eig_v[3], fk10, fk20, fk30;
+  float        nk[3];
+  float         omega[6];
+  cufftComplex  eig_v[3], fk10, fk20, fk30;
   
-  nk[0] = kx_d[i];
-  nk[1] = ky_d[j];
-  nk[2] = kz_d[k];
+  nk[0] = (float)kx_d[i];
+  nk[1] = (float)ky_d[j];
+  nk[2] = (float)kz_d[k];
 
   omega[0] = omega_v0[idx];
   omega[1] = omega_v1[idx];
@@ -146,14 +147,14 @@ __global__ void Compute_uzero(int *ny_d, int *nz_d,
 
 void Calc_uzero(void){
 
-   int complex_size, double_size;
+   int complex_size, float_size;
 
-   complex_size = sizeof(cuDoubleComplex)*nx*ny*nz;
-   double_size  = sizeof(double)*nx*ny*nz;
+   complex_size = sizeof(cufftComplex)*nx*ny*nz;
+   float_size  = sizeof(float)*nx*ny*nz;
    
-   cudaMalloc((void**)&eigstr0, double_size);
-   cudaMalloc((void**)&eigstr1, double_size);
-   cudaMalloc((void**)&eigstr2, double_size);
+   cudaMalloc((void**)&eigstr0, float_size);
+   cudaMalloc((void**)&eigstr1, float_size);
+   cudaMalloc((void**)&eigstr2, float_size);
 
    cudaMalloc((void**)&eigsts00, complex_size);
    cudaMalloc((void**)&eigsts10, complex_size);
@@ -170,9 +171,9 @@ void Calc_uzero(void){
   *          Take eigenstress component to fourier space     * 
   ************************************************************/
 
-   cufftExecZ2Z(plan, eigsts00, eigsts00, CUFFT_FORWARD);
-   cufftExecZ2Z(plan, eigsts10, eigsts10, CUFFT_FORWARD);
-   cufftExecZ2Z(plan, eigsts20, eigsts20, CUFFT_FORWARD);
+   cufftExecC2C(elast_plan, eigsts00, eigsts00, CUFFT_FORWARD);
+   cufftExecC2C(elast_plan, eigsts10, eigsts10, CUFFT_FORWARD);
+   cufftExecC2C(elast_plan, eigsts20, eigsts20, CUFFT_FORWARD);
  
 /************************************************************
 *                Initializing displacments                  *

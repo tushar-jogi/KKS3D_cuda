@@ -38,8 +38,8 @@ void Get_Input_Parameters (char *fnin, char *fnout)
              &Az_m));
  if(fscanf (fpin, "%s%le%s%le%s%le", param, &mu_p, param, &nu_p, param,
              &Az_p));
- if(fscanf (fpin, "%s%le", param, &epszero ));
- if(fscanf (fpin, "%s%le%le%le%le%le%le",param,&sigappl_v[0],&sigappl_v[1],
+ if(fscanf (fpin, "%s%e", param, &epszero ));
+ if(fscanf (fpin, "%s%e%e%e%e%e%e",param,&sigappl_v[0],&sigappl_v[1],
             &sigappl_v[2],&sigappl_v[3],&sigappl_v[4],&sigappl_v[5]));
  if(fscanf (fpin, "%s%d", param,&create_nuclei));
  if(fscanf (fpin, "%s%d", param,&t_prof1));

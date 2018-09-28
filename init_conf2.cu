@@ -352,22 +352,22 @@ void Init_Conf(void)
    Chom12 = 0.5*(C12p + C12m);    
    Chom44 = 0.5*(C44p + C44m);    
 
-   checkCudaErrors(cudaMemcpy(Chom11_d, &Chom11, sizeof(double),
+   checkCudaErrors(cudaMemcpy(Chom11_d, &Chom11, sizeof(float),
          cudaMemcpyHostToDevice));
-   checkCudaErrors(cudaMemcpy(Chom12_d, &Chom12, sizeof(double),
+   checkCudaErrors(cudaMemcpy(Chom12_d, &Chom12, sizeof(float),
          cudaMemcpyHostToDevice));
-   checkCudaErrors(cudaMemcpy(Chom44_d, &Chom44, sizeof(double),
+   checkCudaErrors(cudaMemcpy(Chom44_d, &Chom44, sizeof(float),
          cudaMemcpyHostToDevice));
 
    Chet11 = 0.5*(C11p - C11m);    
    Chet12 = 0.5*(C12p - C12m);    
    Chet44 = 0.5*(C44p - C44m);
 
-   checkCudaErrors(cudaMemcpy(Chet11_d, &Chet11, sizeof(double),
+   checkCudaErrors(cudaMemcpy(Chet11_d, &Chet11, sizeof(float),
          cudaMemcpyHostToDevice));
-   checkCudaErrors(cudaMemcpy(Chet12_d, &Chet12, sizeof(double),
+   checkCudaErrors(cudaMemcpy(Chet12_d, &Chet12, sizeof(float),
          cudaMemcpyHostToDevice));
-   checkCudaErrors(cudaMemcpy(Chet44_d, &Chet11, sizeof(double),
+   checkCudaErrors(cudaMemcpy(Chet44_d, &Chet11, sizeof(float),
          cudaMemcpyHostToDevice));
 
    dkx = 2.0 * CUDART_PI / ((double) nx * dx);
