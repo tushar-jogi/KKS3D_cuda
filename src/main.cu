@@ -1,4 +1,4 @@
-#include"binary.h"
+#include"../include/binary.h"
 
 int main (void)
 {   
@@ -195,5 +195,5 @@ int main (void)
 }
 
 #include "get_input.cu"
-#include "init_conf2.cu"
+#include "init_conf.cu"
 #include "evolve.cu"

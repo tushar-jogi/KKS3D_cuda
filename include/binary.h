@@ -10,7 +10,7 @@
 #include</usr/local/cuda-9.1/include/math_constants.h>
 #include</usr/local/cuda-9.1/include/cuda_runtime.h>
 #include</usr/local/cuda-9.1/samples/common/inc/helper_cuda.h>
-#include"cub/cub.cuh"
+#include"../lib/cub/cub.cuh"
 
 //#define PI acos(-1.0) 
 #define Tolerance 1.0e-06
