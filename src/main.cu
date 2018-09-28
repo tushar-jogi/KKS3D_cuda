@@ -1,36 +1,60 @@
 #include"../include/binary.h"
 
-int main (void)
+int main (int argc, char*argv[])
 {   
     //Function declarations
     void Get_Input_Parameters (char *fnin, char *fnout);
     void Init_Conf ();
     void Evolve ();
+    void Usage(void);
 
     size_t  complex_size, double_size, float_size, complex_size_elast;
     char finput[15] = "bin1ary";
-    char fnin[30], fnout[30];
+    char fnin[30]="InputParams", fnout[30]="OutParams";
     FILE *fp;
 
-    feenableexcept(FE_DIVBYZERO|FE_INVALID|FE_OVERFLOW|FE_UNDERFLOW);
+    if (argc > 1){
+    	for (int i=0; i<argc; i++){
 
-    if (!(fp = fopen (finput, "r"))) {
-      printf ("File:%s could not be opened\n", finput);
+        	if (strcmp(argv[i],"-i")==0 && argc == 3){ 
+           		strcpy(fnin, argv[i+1]);
+           		printf("Reading Input Parameters from %s\n", fnin);
+                        break;
+        	}
+        	else if (strcmp(argv[i],"-i")==0 && argc==2){
+           		printf("Input file not provided\n");
+           		Usage(); 
+                        exit (EXIT_FAILURE);
+        	}
+        	else if (strcmp(argv[i],"--help")==0){
+           		Usage(); 
+                        exit (EXIT_FAILURE);
+        	}
+        
+    	}
+    }
+    else{
+      Usage();
       exit (EXIT_FAILURE);
     }
-    if(fscanf (fp, "%s", fnin)==1){
-      printf("Input Parameters Filename:%s\n",fnin);
-    }
-    if(fscanf (fp, "%s", fnout)==1){
-      printf("Output Parameters Filename:%s\n",fnout);
-    }
-    if (!(fpout = fopen (fnout, "w"))) {
-      printf ("File:%s could not be opened\n", fnout);
-      exit (EXIT_FAILURE);
-    }
 
-    fclose (fp);
-    fclose (fpout);
+    //if (!(fp = fopen (finput, "r"))) {
+    //  printf ("File:%s could not be opened\n", finput);
+    //  exit (EXIT_FAILURE);
+    //}
+    //if(fscanf (fp, "%s", fnin)==1){
+    //  printf("Input Parameters Filename:%s\n",fnin);
+    //}
+    //if(fscanf (fp, "%s", fnout)==1){
+    //  printf("Output Parameters Filename:%s\n",fnout);
+    //}
+    //if (!(fpout = fopen (fnout, "w"))) {
+    //  printf ("File:%s could not be opened\n", fnout);
+    //  exit (EXIT_FAILURE);
+   // }
+
+    //fclose (fp);
+    //fclose (fpout);
 
     //Reading simulation parameters
     Get_Input_Parameters (fnin, fnout);
@@ -192,6 +216,14 @@ int main (void)
     }
 
     return 0;
+}
+
+void Usage(void){
+     printf("This is the help for KKS3D\n"
+            "Options are:\n"
+            "    --help: display what you are reading\n"
+            "    -i filename: opens the filename for input parameters\n");
+
 }
 
 #include "get_input.cu"

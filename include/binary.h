@@ -2,6 +2,7 @@
 #include<stddef.h>
 #include<stdlib.h>
 #include<math.h>
+#include<strings.h>
 #include<fenv.h>
 #include</usr/local/cuda-9.1/include/cuda.h>
 #include</usr/local/cuda-9.1/include/cuComplex.h>
