@@ -1,5 +1,5 @@
 
-__global__ void ComputeGreentensor(double *kx_d, double *ky_d, double *kz_d, 
+/*__global__ void ComputeGreentensor(double *kx_d, double *ky_d, double *kz_d, 
                           float *Chom11_d, float *Chom12_d, float *Chom44_d,
                           int *nx_d, int *ny_d, int *nz_d, float *omega_v0,
                           float *omega_v1, float *omega_v2, float *omega_v3,
@@ -69,7 +69,7 @@ __global__ void ComputeGreentensor(double *kx_d, double *ky_d, double *kz_d,
 
   __syncthreads();
 
-}
+}*/
 
 
 __global__ void  ComputeGradphi(double *kx_d, double *ky_d, double *kz_d,
@@ -421,14 +421,14 @@ void Evolve(void)
   free(kz);
 
 
-  if (elast_int == 1)
+  /*if (elast_int == 1)
     ComputeGreentensor<<< Gridsize, Blocksize >>>(kx_d, ky_d, kz_d, Chom11_d, 
                                                   Chom12_d, Chom44_d,
                                                   nx_d, ny_d, nz_d, omega_v0,
                                                   omega_v1, omega_v2,
                                                   omega_v3, omega_v4,
                                                   omega_v5);
-
+*/
   if (inhom != 1){
 
     S11 = ((Chom11)+(Chom12))/((Chom11)*(Chom11) + (Chom11)*(Chom12) -

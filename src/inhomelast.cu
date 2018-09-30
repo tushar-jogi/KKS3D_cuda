@@ -495,7 +495,8 @@ __global__ void Update_disp(int *ny_d, int *nz_d,
                             cufftComplex *ts4_d, cufftComplex *ts5_d,
                             cufftComplex *unewx_d, 
                             cufftComplex *unewy_d, 
-                            cufftComplex *unewz_d)
+                            cufftComplex *unewz_d, float *Chom11_d, float *Chom12_d,
+                            float *Chom44_d)
 {
    	
   int i = threadIdx.x + blockDim.x*blockIdx.x;
@@ -504,19 +505,61 @@ __global__ void Update_disp(int *ny_d, int *nz_d,
 
   int idx = k + (*nz_d)*(j + i*(*ny_d));
 
-  float          nk[3], omega[6];
+  float        adjomega[6], det_omega, invomega_v[6];
+  float        nk[3], omega[6];
   cufftComplex stmp_v[6], fk10, fk20, fk30;
 
   nk[0] = (float)kx_d[i];
   nk[1] = (float)ky_d[j];
   nk[2] = (float)kz_d[k];
 
-  omega[0] = omega_v0[idx];
-  omega[1] = omega_v1[idx];
-  omega[2] = omega_v2[idx];
-  omega[3] = omega_v3[idx];
-  omega[4] = omega_v4[idx];
-  omega[5] = omega_v5[idx];
+  invomega_v[0] = (*Chom11_d)*nk[0]*nk[0] + (*Chom44_d)*nk[1]*nk[1] +
+                  (*Chom44_d)*nk[2]*nk[2];
+  invomega_v[1] = (*Chom44_d)*nk[0]*nk[0] + (*Chom11_d)*nk[1]*nk[1] +
+                  (*Chom44_d)*nk[2]*nk[2];
+  invomega_v[2] = (*Chom44_d)*nk[0]*nk[0] + (*Chom44_d)*nk[1]*nk[1] +
+                  (*Chom11_d)*nk[2]*nk[2];
+  invomega_v[3] = ((*Chom12_d) + (*Chom44_d))*nk[1]*nk[2];
+  invomega_v[4] = ((*Chom12_d) + (*Chom44_d))*nk[0]*nk[2];
+  invomega_v[5] = ((*Chom12_d) + (*Chom44_d))*nk[0]*nk[1];
+
+  det_omega = invomega_v[0]*(invomega_v[1]*invomega_v[2] -
+                             invomega_v[3]*invomega_v[3])-
+              invomega_v[5]*(invomega_v[5]*invomega_v[2] -
+                             invomega_v[4]*invomega_v[3])+
+              invomega_v[4]*(invomega_v[5]*invomega_v[3] -
+                             invomega_v[4]*invomega_v[1]);
+
+  adjomega[0] = (invomega_v[1]*invomega_v[2]-
+                 invomega_v[3]*invomega_v[3]);
+  adjomega[1] = (invomega_v[0]*invomega_v[2]-
+                 invomega_v[4]*invomega_v[4]);
+  adjomega[2] = (invomega_v[0]*invomega_v[1]-
+                 invomega_v[5]*invomega_v[5]);
+  adjomega[3] =-(invomega_v[0]*invomega_v[3]-
+                 invomega_v[4]*invomega_v[5]);
+  adjomega[4] = (invomega_v[5]*invomega_v[3]-
+                 invomega_v[4]*invomega_v[1]);
+  adjomega[5] =-(invomega_v[5]*invomega_v[2]-
+                 invomega_v[4]*invomega_v[3]);
+
+  if (fabs(det_omega) > 1.0e-06){
+     omega[0] = (1.0/det_omega)*adjomega[0];
+     omega[1] = (1.0/det_omega)*adjomega[1];
+     omega[2] = (1.0/det_omega)*adjomega[2];
+     omega[3] = (1.0/det_omega)*adjomega[3];
+     omega[4] = (1.0/det_omega)*adjomega[4];
+     omega[5] = (1.0/det_omega)*adjomega[5];
+  }
+
+  else{
+     omega[0] = 0.0;
+     omega[1] = 0.0;
+     omega[2] = 0.0;
+     omega[3] = 0.0;
+     omega[4] = 0.0;
+     omega[5] = 0.0;
+  }
 
   stmp_v[0].x = ts0_d[idx].x;    
   stmp_v[1].x = ts1_d[idx].x;    
@@ -957,7 +1000,7 @@ void InhomElast (void){
       Update_disp<<< Gridsize,Blocksize >>>(ny_d, nz_d, kx_d, ky_d, kz_d, 
               omega_v0, omega_v1, omega_v2, omega_v3, omega_v4, omega_v5,
               ts0_d, ts1_d, ts2_d, ts3_d, ts4_d, ts5_d, 
-              unewx_d, unewy_d, unewz_d);
+              unewx_d, unewy_d, unewz_d, Chom11_d, Chom12_d, Chom44_d);
 
       // Finding periodic strains
       Compute_perstr<<< Gridsize, Blocksize >>>(ny_d, nz_d, kx_d, ky_d, kz_d, 
