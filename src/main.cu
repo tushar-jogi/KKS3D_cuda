@@ -120,10 +120,10 @@ int main (int argc, char*argv[])
     comp     = (cuDoubleComplex*) malloc (complex_size);
     dfdphi   = (cuDoubleComplex*) malloc (complex_size); 
 
-    checkCudaErrors(cudaMalloc((void**)&comp_d,complex_size));
-    checkCudaErrors(cudaMalloc((void**)&phi_d,complex_size));
-    checkCudaErrors(cudaMalloc((void**)&dfdphi_d,complex_size));
-    checkCudaErrors(cudaMalloc((void**)&dfdc_d,complex_size));
+    checkCudaErrors(cudaMalloc((void**)&comp_d, complex_size));
+    checkCudaErrors(cudaMalloc((void**)&phi_d, complex_size));
+    checkCudaErrors(cudaMalloc((void**)&dfdphi_d, complex_size));
+    checkCudaErrors(cudaMalloc((void**)&dfdc_d, complex_size));
 
     //Allocation of elasticity varaibles
     if (elast_int == 1){
@@ -131,13 +131,13 @@ int main (int argc, char*argv[])
       checkCudaErrors(cudaMalloc((void**)&ux_d, complex_size_elast));
       checkCudaErrors(cudaMalloc((void**)&uy_d, complex_size_elast));
       checkCudaErrors(cudaMalloc((void**)&uz_d, complex_size_elast));
-      checkCudaErrors(cudaMalloc((void**)&dfeldphi_d,complex_size));
-      checkCudaErrors(cudaMalloc((void**)&omega_v0, float_size));
-      checkCudaErrors(cudaMalloc((void**)&omega_v1, float_size));
-      checkCudaErrors(cudaMalloc((void**)&omega_v2, float_size));
-      checkCudaErrors(cudaMalloc((void**)&omega_v3, float_size));
-      checkCudaErrors(cudaMalloc((void**)&omega_v4, float_size));
-      checkCudaErrors(cudaMalloc((void**)&omega_v5, float_size));
+      checkCudaErrors(cudaMalloc((void**)&dfeldphi_d, complex_size_elast));
+      //checkCudaErrors(cudaMalloc((void**)&omega_v0, float_size));
+      //checkCudaErrors(cudaMalloc((void**)&omega_v1, float_size));
+      //checkCudaErrors(cudaMalloc((void**)&omega_v2, float_size));
+      //checkCudaErrors(cudaMalloc((void**)&omega_v3, float_size));
+      //checkCudaErrors(cudaMalloc((void**)&omega_v4, float_size));
+      //checkCudaErrors(cudaMalloc((void**)&omega_v5, float_size));
 
     }
 
@@ -206,12 +206,12 @@ int main (int argc, char*argv[])
       cudaFree (uy_d);
       cudaFree (uz_d);
       cudaFree (dfeldphi_d);
-      cudaFree (omega_v0);
-      cudaFree (omega_v1);
-      cudaFree (omega_v2);
-      cudaFree (omega_v3);
-      cudaFree (omega_v4);
-      cudaFree (omega_v5);
+      //cudaFree (omega_v0);
+      //cudaFree (omega_v1);
+      //cudaFree (omega_v2);
+      //cudaFree (omega_v3);
+      //cudaFree (omega_v4);
+      //cudaFree (omega_v5);
 
     }
 
