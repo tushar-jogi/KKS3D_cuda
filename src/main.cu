@@ -103,11 +103,6 @@ int main (int argc, char*argv[])
     
     w = 6.0 * alpha * interface_energy / Ln;
     printf("Barrier potential = %lf\n", w);
-     
-    checkCudaErrors(cudaMemcpy(w_d,  &w,  sizeof(double),
-          cudaMemcpyHostToDevice));
-    checkCudaErrors(cudaMemcpy(kappa_phi_d,  &kappa_phi,  sizeof(double),
-          cudaMemcpyHostToDevice));
 
     sim_time = 0.0;
 
