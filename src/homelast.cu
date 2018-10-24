@@ -1,475 +1,358 @@
 /**************************************************************************
 
-  Interpolation = 1 : elastic constants as function of composition
-  Interpolation = 2 : elastic constants as function of phi 
+   last update: Memory is reduced by computing Ctotal, Cinhom and
+                eigenstrain on the fly.
+   Date: 24/09/2018 
 
 ************************************************************************/
-#define TOLERENCE 1.0e-05
-#define FALSE 0
-#define TRUE  1
-void HomElast (void){
+#define TOLERENCE 1.0e-06
 
-   int              ii,jj,converge=1,iter=1;
-   int              complex_size, double_size;
-   double           avgeigstress_v[6];
-   double           nk[3];  
-   double           hom_strain_v[6];
-   double           omega[6];
-   cuDoubleComplex  temp_v[6], stmp_v[6];
-   //int              MatrixInvert(double *mat, double *invMat, int order, 
-   //               int lda);
+__global__ void Compute_eigsts_hom(cufftDoubleComplex *eigsts00, 
+                                   cufftDoubleComplex *eigsts10, 
+                                   cufftDoubleComplex *eigsts20, 
+                                   cufftDoubleComplex *dfdphi_d, 
+                                   double Chom11_d, double Chom12_d, 
+                                   double Chom44_d, double epszero_d, 
+                                   int ny_d, int nz_d)
+{
 
+  int i = threadIdx.x + blockDim.x*blockIdx.x;
+  int j = threadIdx.y + blockDim.y*blockIdx.y;
+  int k = threadIdx.z + blockDim.z*blockIdx.z;
 
-   complex_size = sizeof(cuDoubleComplex)*nx*ny;
-   double_size  = sizeof(double)*nx*ny;
+  int idx = k + (nz_d)*(j + i*(ny_d));
 
-   str_v0   = (cuDoubleComplex*) malloc (complex_size);
-   str_v1   = (cuDoubleComplex*) malloc (complex_size);
-   str_v2   = (cuDoubleComplex*) malloc (complex_size);
-   str_v3   = (cuDoubleComplex*) malloc (complex_size);
-   str_v4   = (cuDoubleComplex*) malloc (complex_size);
-   str_v5   = (cuDoubleComplex*) malloc (complex_size);
-   ts0      = (cuDoubleComplex*) malloc (complex_size);
-   ts1      = (cuDoubleComplex*) malloc (complex_size);
-   ts2      = (cuDoubleComplex*) malloc (complex_size);
-   ts3      = (cuDoubleComplex*) malloc (complex_size);
-   ts4      = (cuDoubleComplex*) malloc (complex_size);
-   ts5      = (cuDoubleComplex*) malloc (complex_size);
-
-   for (int m = 0; m < 6; m++) 
-     eigenstrain_v[m] = (double*) malloc(double_size); 
-   
-
-  /*----------------------------------------------------------------------
-   *                        Compliance tensor calculations 
-   *---------------------------------------------------------------------*/
-   
-   /*Inhomogenous part of total stiffness tensor in Voight's form*/ 
-
-   for (ii = 0; ii < 6; ii++)
-     avgeigstress_v[ii] = 0.0;
-
-   for (int l = 0; l < (nx*ny); l++){
-
-     double hphi, e_temp;
-
-     e_temp = Re(dfdphi[l]);
-           
-     hphi = e_temp*e_temp*e_temp*(6.0*e_temp*e_temp - 15.0*e_temp 
-            + 10.0);
-
-     eigenstrain_v[0][l] = epszero*hphi;
-     eigenstrain_v[1][l] = epszero*hphi;
-     eigenstrain_v[2][l] = 0.0;
-     eigenstrain_v[3][l] = 0.0;
-     eigenstrain_v[4][l] = 0.0;
-     eigenstrain_v[5][l] = 0.0;
-
-     avgeigstress_v[0] = avgeigstress_v[0]+
-                         Chom11*eigenstrain_v[0][l]+
-                         Chom12*eigenstrain_v[1][l]+
-                         Chom12*eigenstrain_v[2][l];
-
-     avgeigstress_v[1] = avgeigstress_v[1]+
-                         Chom12*eigenstrain_v[0][l]+
-                         Chom11*eigenstrain_v[1][l]+
-                         Chom12*eigenstrain_v[2][l];
-
-     avgeigstress_v[2] = avgeigstress_v[2]+
-                         Chom12*eigenstrain_v[0][l]+
-                         Chom12*eigenstrain_v[1][l]+
-                         Chom11*eigenstrain_v[2][l];
-
-     avgeigstress_v[3] = avgeigstress_v[3]+
-                         Chom44*eigenstrain_v[3][l];
-
-     avgeigstress_v[4] = avgeigstress_v[4]+
-                         Chom44*eigenstrain_v[4][l];
-
-     avgeigstress_v[5] = avgeigstress_v[5]+
-                         Chom44*eigenstrain_v[5][l];
-       
-   }
-
-   /*Calculate volume average eigen stress*/
-   avgeigstress_v[0] *= sizescale;  
-   avgeigstress_v[1] *= sizescale;  
-   avgeigstress_v[2] *= sizescale;  
-   avgeigstress_v[3] *= sizescale;  
-   avgeigstress_v[4] *= sizescale;  
-   avgeigstress_v[5] *= sizescale;  
-
-   hom_strain_v[0] = 0.0;
-   hom_strain_v[1] = 0.0;
-   hom_strain_v[2] = 0.0;
-   hom_strain_v[3] = 0.0;
-   hom_strain_v[4] = 0.0;
-   hom_strain_v[5] = 0.0;
-         
-   for (ii=0; ii<6; ii++)
-     for (jj=0; jj<6; jj++)
-        hom_strain_v[ii] += S_v[ii][jj] *
-               (sigappl_v[jj] + avgeigstress_v[jj]);
-
-   for (int l=0; l<(nx*ny); l++){
-      
-      ts0[l].x = Chom11*(eigenstrain_v[0][l]-hom_strain_v[0])+
-                 Chom12*(eigenstrain_v[1][l]-hom_strain_v[1])+
-                 Chom12*(eigenstrain_v[2][l]-hom_strain_v[2]);
-
-      ts1[l].x = Chom12*(eigenstrain_v[0][l]-hom_strain_v[0])+
-                 Chom11*(eigenstrain_v[1][l]-hom_strain_v[1])+ 
-                 Chom12*(eigenstrain_v[2][l]-hom_strain_v[2]);
-
-      ts2[l].x = Chom12*(eigenstrain_v[0][l]-hom_strain_v[0])+
-                 Chom12*(eigenstrain_v[1][l]-hom_strain_v[1])+
-                 Chom11*(eigenstrain_v[2][l]-hom_strain_v[2]);
-
-      ts3[l].x = Chom44*(eigenstrain_v[3][l]-hom_strain_v[3]); 
-
-      ts4[l].x = Chom44*(eigenstrain_v[4][l]-hom_strain_v[4]);
-
-      ts5[l].x = Chom44*(eigenstrain_v[5][l]-hom_strain_v[5]);
-             
-      ts0[l].y = 0.0;          
-      ts1[l].y = 0.0;          
-      ts2[l].y = 0.0;          
-      ts3[l].y = 0.0;          
-      ts4[l].y = 0.0;          
-      ts5[l].y = 0.0;          
-          
-    }
-
-    cudaMalloc((void**)&ts0_d, complex_size);
-    cudaMalloc((void**)&ts1_d, complex_size);
-    cudaMalloc((void**)&ts2_d, complex_size);
-    cudaMalloc((void**)&ts3_d, complex_size);
-    cudaMalloc((void**)&ts4_d, complex_size);
-    cudaMalloc((void**)&ts5_d, complex_size);
-
-    cudaMemcpy(ts0_d, ts0, complex_size, cudaMemcpyHostToDevice);
-    cudaMemcpy(ts1_d, ts1, complex_size, cudaMemcpyHostToDevice);
-    cudaMemcpy(ts2_d, ts2, complex_size, cudaMemcpyHostToDevice);
-    cudaMemcpy(ts3_d, ts3, complex_size, cudaMemcpyHostToDevice);
-    cudaMemcpy(ts4_d, ts4, complex_size, cudaMemcpyHostToDevice);
-    cudaMemcpy(ts5_d, ts5, complex_size, cudaMemcpyHostToDevice);
-
-    cufftExecZ2Z(plan,(cuDoubleComplex*)ts0_d,
-                (cuDoubleComplex*)ts0_d,CUFFT_FORWARD);
-    cufftExecZ2Z(plan,(cuDoubleComplex*)ts1_d,
-                (cuDoubleComplex*)ts1_d,CUFFT_FORWARD);
-    cufftExecZ2Z(plan,(cuDoubleComplex*)ts2_d,
-                (cuDoubleComplex*)ts2_d,CUFFT_FORWARD);
-    cufftExecZ2Z(plan,(cuDoubleComplex*)ts3_d,
-                (cuDoubleComplex*)ts3_d,CUFFT_FORWARD);
-    cufftExecZ2Z(plan,(cuDoubleComplex*)ts4_d,
-                (cuDoubleComplex*)ts4_d,CUFFT_FORWARD);
-    cufftExecZ2Z(plan,(cuDoubleComplex*)ts5_d,
-                (cuDoubleComplex*)ts5_d,CUFFT_FORWARD);
-
-      
-    cudaMemcpy(ts0, ts0_d, complex_size, cudaMemcpyDeviceToHost);
-    cudaMemcpy(ts1, ts1_d, complex_size, cudaMemcpyDeviceToHost);
-    cudaMemcpy(ts2, ts2_d, complex_size, cudaMemcpyDeviceToHost);
-    cudaMemcpy(ts3, ts3_d, complex_size, cudaMemcpyDeviceToHost);
-    cudaMemcpy(ts4, ts4_d, complex_size, cudaMemcpyDeviceToHost);
-    cudaMemcpy(ts5, ts5_d, complex_size, cudaMemcpyDeviceToHost);
-
-    cudaFree(ts0_d);
-    cudaFree(ts1_d);
-    cudaFree(ts2_d);
-    cudaFree(ts3_d);
-    cudaFree(ts4_d);
-    cudaFree(ts5_d);
-
-  /*-----------------------------------------------------------------------
-   *                        Refinement of displacement
-   *---------------------------------------------------------------------*/
-    while (converge != FALSE){
-
-      for (int i = 0; i<(nx); i++){
-        for (int j = 0; j < ny; j++){
-
-            nk[0] = kx[i];
-            nk[1] = ky[j];
-            nk[2] = 0.0;
-
-            int m = (j+i*ny);
-
-            omega[0] = omega_v[0][m];
-            omega[1] = omega_v[1][m];
-            omega[2] = omega_v[2][m];
-            omega[3] = omega_v[3][m];
-            omega[4] = omega_v[4][m];
-            omega[5] = omega_v[5][m];
-
-            stmp_v[0].x = ts0[m].x;    
-            stmp_v[1].x = ts1[m].x;    
-            stmp_v[2].x = ts2[m].x;    
-            stmp_v[3].x = ts3[m].x;    
-            stmp_v[4].x = ts4[m].x;    
-            stmp_v[5].x = ts5[m].x;
-
-            stmp_v[0].y = ts0[m].y;    
-            stmp_v[1].y = ts1[m].y;    
-            stmp_v[2].y = ts2[m].y;    
-            stmp_v[3].y = ts3[m].y;    
-            stmp_v[4].y = ts4[m].y;    
-            stmp_v[5].y = ts5[m].y;
-
-            fk10.x = stmp_v[0].x * nk[0] + stmp_v[5].x * nk[1] + 
-                     stmp_v[4].x * nk[2];
-            fk20.x = stmp_v[5].x * nk[0] + stmp_v[1].x * nk[1] + 
-                     stmp_v[3].x * nk[2];
-            fk30.x = stmp_v[4].x * nk[0] + stmp_v[3].x * nk[1] + 
-                     stmp_v[2].x * nk[2];   
-
-            fk10.y = stmp_v[0].y * nk[0] + stmp_v[5].y * nk[1] + 
-                     stmp_v[4].y * nk[2];
-            fk20.y = stmp_v[5].y * nk[0] + stmp_v[1].y * nk[1] + 
-                     stmp_v[3].y * nk[2];
-            fk30.y = stmp_v[4].y * nk[0] + stmp_v[3].y * nk[1] + 
-                     stmp_v[2].y * nk[2];    
-           
-            unewx[m].x = omega[0] * fk10.y + 
-                         omega[5] * fk20.y +
-                         omega[4] * fk30.y ;
-
-            unewy[m].x = omega[5] * fk10.y + 
-                         omega[1] * fk20.y +
-                         omega[3] * fk30.y ;
- 
-        
-            unewx[m].y = -1.0*(omega[0] * fk10.x + 
-                               omega[5] * fk20.x +
-                               omega[4] * fk30.x );
-
-            unewy[m].y = -1.0*(omega[5] * fk10.x + 
-                               omega[1] * fk20.x +
-                               omega[3] * fk30.x );
- 
-        }   
-      }
-
-      cudaMalloc((void**)&unewx_d,complex_size);    
-      cudaMalloc((void**)&unewy_d,complex_size);    
-
-      cudaMemcpy(unewx_d, unewx, complex_size, cudaMemcpyHostToDevice);
-      cudaMemcpy(unewy_d, unewy, complex_size, cudaMemcpyHostToDevice);
-
-      cufftExecZ2Z(plan,(cuDoubleComplex*)unewx_d,
-                  (cuDoubleComplex*)unewx_d,CUFFT_INVERSE);
-      cufftExecZ2Z(plan,(cuDoubleComplex*)unewy_d,
-                  (cuDoubleComplex*)unewy_d,CUFFT_INVERSE);
-
-      cudaMemcpy(unewx, unewx_d, complex_size, cudaMemcpyDeviceToHost);
-      cudaMemcpy(unewy, unewy_d, complex_size, cudaMemcpyDeviceToHost);
-
-      cudaFree(unewx_d); 
-      cudaFree(unewy_d); 
-
-      for (int l=0; l<(nx*ny); l++){
-        
-        unewx[l].x *= sizescale;
-        unewy[l].x *= sizescale;
-        unewz[l].x  = 0.0;
-
-        unewx[l].y *= sizescale;
-        unewy[l].y *= sizescale;
-        unewz[l].y  = 0.0;
-      }
-    
-      disperror = 0.0;
-   
-      for (int l=0; l<(nx*ny); l++){
+  double eig11, eig22, eig33, hphi, e_temp;
   
-        disperror += pow ( (Re( unewx[l] ) - Re( ux[l] )), 2.0) + 
-                     pow ( (Re( unewy[l] ) - Re( uy[l] )), 2.0) ;
-           
-      }
+  e_temp = dfdphi_d[idx].x;
 
-      disperror = sqrt(disperror);
+  hphi = e_temp*e_temp*e_temp*(6.0*e_temp*e_temp - 15.0*e_temp + 10.0);
 
-      //printf ("\niter=%d error = %le", iter, disperror);
+  eig11 = epszero_d * hphi; 
+  eig22 = epszero_d * hphi; 
+  eig33 = epszero_d * hphi; 
 
-      if (disperror < TOLERENCE){
-        //printf("\nConvergence achieved at %d\n", iter);
-        converge = 0;
-      }
+  eigsts00[idx].x = (Chom11_d)*eig11 + 
+                    (Chom12_d)*eig22 +
+                    (Chom12_d)*eig33 ;     
 
-      iter = iter + 1;
+  eigsts10[idx].x = (Chom12_d)*eig11 + 
+                    (Chom11_d)*eig22 +
+                    (Chom12_d)*eig33 ;     
 
-      for (int l=0; l<(nx*ny); l++){
-  
-            ux[l] = unewx[l];
-            uy[l] = unewy[l];
-            uz[l] = unewz[l];
-      }
+  eigsts20[idx].x = (Chom12_d)*eig11 + 
+                    (Chom12_d)*eig22 +
+                    (Chom11_d)*eig33 ;
 
-    
-   }
-
-
-/*Heterogeneous strain calculation after refinement*/
-/*      
-   for (int i=0; i<nx; i++){
-    for (int j=0; j<ny; j++){
-     for (int k=0; k<nz; k++){
-    
-      int l = k+nz*(j+i*ny);
-      nk[0] = kx[i];
-      nk[1] = ky[j];
-      nk[2] = kz[k];
-
-      str_v0[l] = 0.0 + I*(ux[l]*nk[0]);
-      str_v1[l] = 0.0 + I*(uy[l]*nk[1]);
-      str_v2[l] = 0.0 + I*(uz[l]*nk[2]);
-      str_v3[l] = 0.0 + I*(uy[l]*nk[2] + uz[l]*nk[1]);
-      str_v4[l] = 0.0 + I*(ux[l]*nk[2] + uz[l]*nk[0]);
-      str_v5[l] = 0.0 + I*(ux[l]*nk[1] + uy[l]*nk[0]);
-     }
-    }
-   }
-*/
-   cudaMalloc((void**)&unewx_d,complex_size);    
-   cudaMalloc((void**)&unewy_d,complex_size);    
-
-   cudaMemcpy(unewx_d,unewx,complex_size,cudaMemcpyHostToDevice);
-   cudaMemcpy(unewy_d,unewy,complex_size,cudaMemcpyHostToDevice);
-
-   cufftExecZ2Z(plan,(cuDoubleComplex*)unewx_d,
-               (cuDoubleComplex*)unewx_d,CUFFT_FORWARD);
-   cufftExecZ2Z(plan,(cuDoubleComplex*)unewy_d,
-               (cuDoubleComplex*)unewy_d,CUFFT_FORWARD);
-
-   cudaMemcpy(unewx, unewx_d, complex_size, cudaMemcpyDeviceToHost);
-   cudaMemcpy(unewy, unewy_d, complex_size, cudaMemcpyDeviceToHost);
-
-   cudaFree(unewx_d); 
-   cudaFree(unewy_d); 
-
-
-   for (int i=0; i<(nx); i++){
-     for (int j=0; j<(ny); j++){
-
-         nk[0] = kx[i];
-         nk[1] = ky[j];
-         nk[2] = 0.0;
-
-         int m = (j+i*ny);
-
-         str_v0[m] = Complex(-1.0*(unewx[m].y*nk[0]),(unewx[m].x*nk[0]));
-         str_v1[m] = Complex(-1.0*(unewy[m].y*nk[1]),(unewx[m].x*nk[1]));
-         str_v2[m] = Complex(-1.0*(unewz[m].y*nk[2]),(unewx[m].x*nk[2]));
-         str_v3[m] = Complex(-1.0*(unewy[m].y*nk[2] + unewz[m].y*nk[1]),
-                                  (unewy[m].x*nk[2] + unewz[m].x*nk[1]));
-         str_v4[m] = Complex(-1.0*(unewx[m].y*nk[2] + unewz[m].y*nk[0]),
-                                  (unewx[m].x*nk[2] + unewz[m].x*nk[0]));
-         str_v5[m] = Complex(-1.0*(unewx[m].y*nk[1] + unewy[m].y*nk[0]),
-                                  (unewx[m].x*nk[1] + unewy[m].x*nk[0]));
-     }  
-   }
-
-   cudaMalloc((void**)&str_v0_d,complex_size);
-   cudaMalloc((void**)&str_v1_d,complex_size);
-   cudaMalloc((void**)&str_v2_d,complex_size);
-   cudaMalloc((void**)&str_v3_d,complex_size);
-   cudaMalloc((void**)&str_v4_d,complex_size);
-   cudaMalloc((void**)&str_v5_d,complex_size);
-  
-   cudaMemcpy(str_v0_d,str_v0,complex_size,cudaMemcpyHostToDevice);
-   cudaMemcpy(str_v1_d,str_v1,complex_size,cudaMemcpyHostToDevice);
-   cudaMemcpy(str_v2_d,str_v2,complex_size,cudaMemcpyHostToDevice);
-   cudaMemcpy(str_v3_d,str_v3,complex_size,cudaMemcpyHostToDevice);
-   cudaMemcpy(str_v4_d,str_v4,complex_size,cudaMemcpyHostToDevice);
-   cudaMemcpy(str_v5_d,str_v5,complex_size,cudaMemcpyHostToDevice);
-
-   cufftExecZ2Z(plan,(cuDoubleComplex*)str_v0_d,
-               (cuDoubleComplex*)str_v0_d,CUFFT_FORWARD);
-   cufftExecZ2Z(plan,(cuDoubleComplex*)str_v1_d,
-               (cuDoubleComplex*)str_v1_d,CUFFT_FORWARD);
-   cufftExecZ2Z(plan,(cuDoubleComplex*)str_v2_d,
-               (cuDoubleComplex*)str_v2_d,CUFFT_FORWARD);
-   cufftExecZ2Z(plan,(cuDoubleComplex*)str_v3_d,
-               (cuDoubleComplex*)str_v3_d,CUFFT_FORWARD);
-   cufftExecZ2Z(plan,(cuDoubleComplex*)str_v4_d,
-               (cuDoubleComplex*)str_v4_d,CUFFT_FORWARD);
-   cufftExecZ2Z(plan,(cuDoubleComplex*)str_v5_d,
-               (cuDoubleComplex*)str_v5_d,CUFFT_FORWARD);
-
-   cudaMemcpy(str_v0,str_v0_d,complex_size,cudaMemcpyDeviceToHost);
-   cudaMemcpy(str_v1,str_v1_d,complex_size,cudaMemcpyDeviceToHost);
-   cudaMemcpy(str_v2,str_v2_d,complex_size,cudaMemcpyDeviceToHost);
-   cudaMemcpy(str_v3,str_v3_d,complex_size,cudaMemcpyDeviceToHost);
-   cudaMemcpy(str_v4,str_v4_d,complex_size,cudaMemcpyDeviceToHost);
-   cudaMemcpy(str_v5,str_v5_d,complex_size,cudaMemcpyDeviceToHost);
-
-   cudaFree(str_v0_d);
-   cudaFree(str_v1_d);
-   cudaFree(str_v2_d);
-   cudaFree(str_v3_d);
-   cudaFree(str_v4_d);
-   cudaFree(str_v5_d);
-
-   for (int l=0; l<(nx*ny); l++){
- 
-     str_v0[l].x *= sizescale;  
-     str_v1[l].x *= sizescale;  
-     str_v2[l].x *= sizescale;
-     str_v3[l].x *= sizescale; 
-     str_v4[l].x *= sizescale;
-     str_v5[l].x *= sizescale;
-
-     str_v0[l].y *= sizescale;  
-     str_v1[l].y *= sizescale;  
-     str_v2[l].y *= sizescale;
-     str_v3[l].y *= sizescale; 
-     str_v4[l].y *= sizescale;
-     str_v5[l].y *= sizescale;
-
-   }
-
-
-   /* Elastic driving force  */
-   for (int l = 0; l < (nx*ny); l++){
-    
-     double hphi_p, e_temp;
-
-     e_temp = Re(dfdphi[l]);
-     hphi_p = (30.0*e_temp*e_temp*(1.0-e_temp)*(1.0-e_temp));           
-
-     dfeldphi[l].x = -1.0*
-               (Chom11*(hom_strain_v[0]+str_v0[l].x-eigenstrain_v[0][l])*
-                epszero*hphi_p+
-                Chom11*(hom_strain_v[1]+str_v1[l].x-eigenstrain_v[1][l])*
-                epszero*hphi_p+
-                Chom12*(hom_strain_v[1]+str_v1[l].x-eigenstrain_v[1][l])*
-                epszero*hphi_p+
-                Chom12*(hom_strain_v[0]+str_v0[l].x-eigenstrain_v[0][l])*
-                epszero*hphi_p+
-                Chom12*(hom_strain_v[2]+str_v2[l].x-eigenstrain_v[2][l])*
-                epszero*hphi_p+ 
-                Chom12*(hom_strain_v[2]+str_v2[l].x-eigenstrain_v[2][l])*
-                epszero*hphi_p
-               );
-
-     dfeldphi[l].y = 0.0;
-   }
-
-   free (str_v0);
-   free (str_v1);
-   free (str_v2);
-   free (str_v3);
-   free (str_v4);
-   free (str_v5);
-   free (ts0);
-   free (ts1);
-   free (ts2);
-   free (ts3);
-   free (ts4);
-   free (ts5);
-   for (int ii=0; ii<6; ii++)
-   free (eigenstrain_v[ii]);
-
+  eigsts00[idx].y = 0.0;    
+  eigsts10[idx].y = 0.0;    
+  eigsts20[idx].y = 0.0;    
 
 }
+__global__ void Compute_Ctotal(cuDoubleComplex *dfdphi_d, int ny_d, 
+                              int nz_d, double *Ctotal, double Chom11_d, 
+                              double Chet11_d)
+{
+
+   int i = threadIdx.x + blockDim.x*blockIdx.x;
+   int j = threadIdx.y + blockDim.y*blockIdx.y;
+   int k = threadIdx.z + blockDim.z*blockIdx.z;
+
+   int idx = k + (nz_d)*(j + i*(ny_d));
+
+   double hphi, e_temp;
+
+   e_temp = Re(dfdphi_d[idx]);
+   hphi = e_temp*e_temp*e_temp*(6.0*e_temp*e_temp - 15.0*e_temp  + 10.0);
+
+   Ctotal[idx]  =  (Chom11_d) + (Chet11_d*(2.0*hphi - 1.0));
+   
+}
+
+
+__global__ void Compute_Sij_hom(double *Cavg11, double *Cavg12, double *Cavg44,
+                            double *S11_d, double *S12_d, double *S44_d)
+{
+  *S11_d = ((*Cavg11) + (*Cavg12))/((*Cavg11)*(*Cavg11) + (*Cavg11)*(*Cavg12)-
+           2.0*(*Cavg12)*(*Cavg12));
+  *S12_d = (-1.0*(*Cavg12))/((*Cavg11)*(*Cavg11) + (*Cavg11)*(*Cavg12) -
+           2.0*(*Cavg12)*(*Cavg12));
+  *S44_d = 1.0/(*Cavg44);
+
+}
+
+__global__ void Compute_uzero(int ny_d, int nz_d, 
+                          cufftDoubleComplex *ux_d, cufftDoubleComplex *uy_d,
+                          cufftDoubleComplex *uz_d, double *kx_d, double *ky_d,
+                          double *kz_d, cufftDoubleComplex *eigsts00, 
+                          cufftDoubleComplex *eigsts10, 
+                          cufftDoubleComplex *eigsts20,
+                          double Chom11_d, double Chom12_d, double Chom44_d)
+{
+
+  int i = threadIdx.x + blockDim.x*blockIdx.x;
+  int j = threadIdx.y + blockDim.y*blockIdx.y;
+  int k = threadIdx.z + blockDim.z*blockIdx.z;
+
+  int idx = k + (nz_d)*(j + i*(ny_d));
+
+  double               adjomega[6], det_omega, invomega_v[6];
+  double               nk[3];
+  double               omega[6];
+  cufftDoubleComplex   eig_v[3], fk10, fk20, fk30;
+  
+  nk[0] = (double)kx_d[i];
+  nk[1] = (double)ky_d[j];
+  nk[2] = (double)kz_d[k];
+
+  invomega_v[0] = (Chom11_d)*nk[0]*nk[0] + (Chom44_d)*nk[1]*nk[1] +
+                  (Chom44_d)*nk[2]*nk[2];
+  invomega_v[1] = (Chom44_d)*nk[0]*nk[0] + (Chom11_d)*nk[1]*nk[1] +
+                  (Chom44_d)*nk[2]*nk[2];
+  invomega_v[2] = (Chom44_d)*nk[0]*nk[0] + (Chom44_d)*nk[1]*nk[1] +
+                  (Chom11_d)*nk[2]*nk[2];
+  invomega_v[3] = ((Chom12_d) + (Chom44_d))*nk[1]*nk[2];
+  invomega_v[4] = ((Chom12_d) + (Chom44_d))*nk[0]*nk[2];
+  invomega_v[5] = ((Chom12_d) + (Chom44_d))*nk[0]*nk[1];
+
+  det_omega = invomega_v[0]*(invomega_v[1]*invomega_v[2] -
+                             invomega_v[3]*invomega_v[3])-
+              invomega_v[5]*(invomega_v[5]*invomega_v[2] -
+                             invomega_v[4]*invomega_v[3])+
+              invomega_v[4]*(invomega_v[5]*invomega_v[3] -
+                             invomega_v[4]*invomega_v[1]);
+
+  adjomega[0] = (invomega_v[1]*invomega_v[2]-
+                 invomega_v[3]*invomega_v[3]);
+  adjomega[1] = (invomega_v[0]*invomega_v[2]-
+                 invomega_v[4]*invomega_v[4]);
+  adjomega[2] = (invomega_v[0]*invomega_v[1]-
+                 invomega_v[5]*invomega_v[5]);
+  adjomega[3] =-(invomega_v[0]*invomega_v[3]-
+                 invomega_v[4]*invomega_v[5]);
+  adjomega[4] = (invomega_v[5]*invomega_v[3]-
+                 invomega_v[4]*invomega_v[1]);
+  adjomega[5] =-(invomega_v[5]*invomega_v[2]-
+                 invomega_v[4]*invomega_v[3]);
+
+  if (fabs(det_omega) > 1.0e-06){
+     omega[0] = (1.0/det_omega)*adjomega[0];
+     omega[1] = (1.0/det_omega)*adjomega[1];
+     omega[2] = (1.0/det_omega)*adjomega[2];
+     omega[3] = (1.0/det_omega)*adjomega[3];
+     omega[4] = (1.0/det_omega)*adjomega[4];
+     omega[5] = (1.0/det_omega)*adjomega[5];
+  }
+
+  else{
+     omega[0] = 0.0;
+     omega[1] = 0.0;
+     omega[2] = 0.0;
+     omega[3] = 0.0;
+     omega[4] = 0.0;
+     omega[5] = 0.0;
+  }
+
+  eig_v[0].x = eigsts00[idx].x; 
+  eig_v[1].x = eigsts10[idx].x; 
+  eig_v[2].x = eigsts20[idx].x; 
+
+  eig_v[0].y = eigsts00[idx].y; 
+  eig_v[1].y = eigsts10[idx].y; 
+  eig_v[2].y = eigsts20[idx].y; 
+ 
+  fk10.x = eig_v[0].x*nk[0];
+  fk20.x = eig_v[1].x*nk[1];
+  fk30.x = eig_v[2].x*nk[2];
+
+  fk10.y = eig_v[0].y*nk[0];
+  fk20.y = eig_v[1].y*nk[1];
+  fk30.y = eig_v[2].y*nk[2];
+
+  ux_d[idx].x = omega[0]*fk10.y +
+                omega[5]*fk20.y +
+                omega[4]*fk30.y ;  
+ 
+  uy_d[idx].x = omega[5]*fk10.y +
+                omega[1]*fk20.y +
+                omega[3]*fk30.y ;   
+
+  uz_d[idx].x = omega[4]*fk10.y +
+                omega[3]*fk20.y +
+                omega[2]*fk30.y ;   
+
+  ux_d[idx].y = -1.0*(omega[0]*fk10.x +
+                      omega[5]*fk20.x +
+                      omega[4]*fk30.x);   
+
+  uy_d[idx].y = -1.0*(omega[5]*fk10.x +
+                      omega[1]*fk20.x +
+                      omega[3]*fk30.x);   
+ 
+  uz_d[idx].y = -1.0*(omega[4]*fk10.x +
+                      omega[3]*fk20.x +
+                      omega[2]*fk30.x);   
+
+}
+__global__ void Compute_perstr(int ny, int nz, cuDoubleComplex *ux_d, cuDoubleComplex *uy_d, 
+                               cuDoubleComplex *uz_d, double *kx_d, double *ky_d, double *kz_d)
+{
+	
+  int i = threadIdx.x + blockDim.x*blockIdx.x;
+  int j = threadIdx.y + blockDim.y*blockIdx.y;
+  int k = threadIdx.z + blockDim.z*blockIdx.z;
+
+  int idx = k + (nz)*(j + i*(ny));
+
+  ux_d[idx].x = -1.0*kx_d[i]*ux_d[idx].y;
+  uy_d[idx].x = -1.0*ky_d[j]*uy_d[idx].y;
+  uz_d[idx].x = -1.0*kz_d[k]*uz_d[idx].y;
+
+  ux_d[idx].y = kx_d[i]*ux_d[idx].x;
+  uy_d[idx].y = ky_d[j]*uy_d[idx].x;
+  uz_d[idx].y = kz_d[k]*uz_d[idx].x;
+   
+  
+}
+__global__ void Average(double *x, double sizescale)
+{
+   *x = (double)(*x*(sizescale));
+}
+
+void HomElast(void){
+
+  int complex_size;
+
+  checkCudaErrors(cudaMalloc((void**)&hom_strain_v, 3*sizeof(double)));
+  cub::DeviceReduce::Sum(t_storage, t_storage_bytes, ux_d,
+                         hom_strain_v[0], nx*ny*nz);
+  complex_size = sizeof(cufftDoubleComplex)*nx*ny*nz;
+   
+  Compute_eigsts_hom<<< Gridsize,Blocksize >>>(ux_d, uy_d, uz_d, 
+                                               dfdphi_d, 
+                                               Chom11, Chom12, Chom44, 
+                                               epszero, ny, nz);
+
+  cub::DeviceReduce::Sum(t_storage, t_storage_bytes, ux_d,
+                         hom_strain_v[0], nx*ny*nz);
+  cub::DeviceReduce::Sum(t_storage, t_storage_bytes, uy_d,
+                         hom_strain_v[1], nx*ny*nz);
+  cub::DeviceReduce::Sum(t_storage, t_storage_bytes, uz_d,
+                         hom_strain_v[2], nx*ny*nz);
+    
+  Average<<<1,1>>>(hom_strain_v[0], sizescale);
+  Average<<<1,1>>>(hom_strain_v[1], sizescale);
+  Average<<<1,1>>>(hom_strain_v[2], sizescale);
+ /************************************************************
+  *          Take eigenstress component to fourier space     * 
+  ************************************************************/
+
+   cufftExecZ2Z(plan, ux_d, ux_d, CUFFT_FORWARD);
+   cufftExecZ2Z(plan, uy_d, uy_d, CUFFT_FORWARD);
+   cufftExecZ2Z(plan, uz_d, uz_d, CUFFT_FORWARD);
+ 
+/**********************************************************
+ *                 Zeroth order displacement              *
+ **********************************************************/ 
+   Compute_uzero<<< Gridsize, Blocksize >>>(ny, nz, 
+                          ux_d, uy_d, uz_d, kx_d, 
+                          ky_d, kz_d, ux_d, uy_d, uz_d,
+                          Chom11, Chom12, Chom44);
+
+   
+   Compute_perstr<<<Gridsize, Blocksize>>>(ny, nz, ux_d, uy_d, uz_d, kx_d, ky_d, kz_d);
+
+   cufftExecZ2Z(plan, ux_d, ux_d, CUFFT_INVERSE);
+   cufftExecZ2Z(plan, uy_d, uy_d, CUFFT_INVERSE);
+   cufftExecZ2Z(plan, uz_d, uz_d, CUFFT_INVERSE);
+
+   Normalize<<<Gridsize,Blocksize >>>(ux_d, sizescale, ny, nz); 
+   Normalize<<<Gridsize,Blocksize >>>(uy_d, sizescale, ny, nz); 
+   Normalize<<<Gridsize,Blocksize >>>(uz_d, sizescale, ny, nz); 
+   Compute_dfeldphi_hom<<< Gridsize, Blocksize>>>
+                      (ux_d, uy_d, uz_d, dfdphi_d, dfeldphi_d, Chom11_d, Chom12_d,
+                       Chom44_d, hom_strain_v, epszero_d,
+                       ny_d, nz_d);
+
+}
+
+__global__ void Compute_dfeldphi_hom(cuDoubleComplex *ux_d,
+                                     cuDoubleComplex *uy_d,
+                                     cuDoubleComplex *uy_d,
+                                     cuDoubleComplex *dfdphi_d,
+                                     cuDoubleComplex *dfeldphi_d, 
+                                     double Chom11_d, double Chom12_d, double Chom44_d, 
+                                     double *hom_strain_v, double epszero_d,
+                                     int ny_d, int nz_d)
+{
+
+   int i = threadIdx.x + blockDim.x*blockIdx.x;
+   int j = threadIdx.y + blockDim.y*blockIdx.y;
+   int k = threadIdx.z + blockDim.z*blockIdx.z;
+
+   int idx = k + (nz_d)*(j + i*(ny_d));
+
+   double hphi, hphi_p, e_temp, str_v[6], estr[3], hstr[6];
+ 
+   e_temp = dfdphi_d[idx].x;
+   hphi = e_temp*e_temp*e_temp*(6.0*e_temp*e_temp - 15.0*e_temp + 10.0);
+   hphi_p = (30.0*e_temp*e_temp*(1.0-e_temp)*(1.0-e_temp));           
+   
+
+   str_v[0] = ux_d[idx].x;
+   str_v[1] = uy_d[idx].x;
+   str_v[2] = uz_d[idx].x;
+
+   estr[0]  = (epszero_d)*hphi;
+   estr[1]  = (epszero_d)*hphi;
+   estr[2]  = (epszero_d)*hphi;
+ 
+   hstr[0]  = hom_strain_v[0];
+   hstr[1]  = hom_strain_v[1];
+   hstr[2]  = hom_strain_v[2];
+
+   dfeldphi_d[idx].x = 
+                Chom11*
+                (hstr[0]+str_v[0]-estr[0])*
+                (epszero_d)*hphi_p +
+                Chom11*
+                (hstr[1]+str_v[1]-estr[1])*
+                (epszero_d)*hphi_p +
+                Chom11*
+                (hstr[2]+str_v[2]-estr[2])*
+                (epszero_d)*hphi_p +
+                Chom12*
+                (hstr[1]+str_v[1]-estr[1])*
+                (epszero_d)*hphi_p +
+                Chom12*
+                (hstr[1]+str_v[1]-estr[1])*
+                (epszero_d)*hphi_p +
+                Chom12*
+                (hstr[0]+str_v[0]-estr[0])*
+                (epszero_d)*hphi_p +
+                Chom12*
+                (hstr[0]+str_v[0]-estr[0])*
+                (epszero_d)*hphi_p +
+                Chom12*
+                (hstr[2]+str_v[2]-estr[2])*
+                (epszero_d)*hphi_p + 
+                Chom12*
+                (hstr[2]+str_v[2]-estr[2])*
+                (epszero_d)*hphi_p
+               ;
+
+     dfeldphi_d[idx].y = 0.0; 
+} 
+
+
+  Compute_homstr<<<1,1>>>(hom_strain_v, S11_d, S12_d, S44_d, sigappl_v_d,
+                          avgeigsts0, avgeigsts1, avgeigsts2, 
+                          avgpersts0, avgpersts1, avgpersts2, 
+                          avgpersts3, avgpersts4, avgpersts5);
+
+  Compute_dfeldphi<<<Gridsize, Blocksize>>>(str_v0_d, str_v1_d, str_v2_d,
+                                            str_v3_d, str_v4_d, str_v5_d, 
+                                            dfdphi_d, dfeldphi_d, Chom11,
+                                            Chom12, Chom44, Chet11,
+                                            Chet12, Chet44, hom_strain_v, 
+                                            epszero, ny, nz);
