@@ -11,9 +11,7 @@
 ************************************************************************/
 #define TOLERENCE 1.0e-06
 
-__global__ void Compute_eigstr_hom(cufftDoubleComplex *eigstr0, 
-                                   cufftDoubleComplex *eigstr1, 
-                                   cufftDoubleComplex *eigstr2, 
+__global__ void Compute_eigstr_hom(double *eigstr0, 
                                    cufftDoubleComplex *dfdphi_d, 
                                    double epszero_d, 
                                    int ny_d, int nz_d)
@@ -31,19 +29,9 @@ __global__ void Compute_eigstr_hom(cufftDoubleComplex *eigstr0,
 
   hphi = e_temp*e_temp*e_temp*(6.0*e_temp*e_temp - 15.0*e_temp + 10.0);
 
-  eig11 = epszero_d * hphi; 
-  eig22 = epszero_d * hphi; 
-  eig33 = epszero_d * hphi; 
+  eigstr0[idx] = epszero_d * hphi;
 
-  eigstr0[idx].x = eig11; 
-
-  eigstr1[idx].x = eig22; 
-
-  eigstr2[idx].x = eig33; 
-
-  eigstr0[idx].y = 0.0;    
-  eigstr1[idx].y = 0.0;    
-  eigstr2[idx].y = 0.0;    
+  __syncthreads(); 
 
 }
 
@@ -193,11 +181,12 @@ __global__ void Compute_perstr(int ny, int nz, cuDoubleComplex *ux_d, cuDoubleCo
   
 }
 
-__global__ void Find_volumeAvg_eigstr(double *x, double sizescale)
+__global__ void Find_volumeAvg_eigstr(double *x, double *y, double *z, 
+                                      double sizescale)
 {
-   x[0] = (x[0]*sizescale);
-   x[1] = (x[1]*sizescale);
-   x[2] = (x[2]*sizescale);
+   *x = (*x*sizescale);
+   *y = (*y*sizescale);
+   *z = (*z*sizescale);
 }
 
 __global__ void Compute_dfeldphi_hom(cuDoubleComplex *ux_d,
@@ -206,7 +195,8 @@ __global__ void Compute_dfeldphi_hom(cuDoubleComplex *ux_d,
                                      cuDoubleComplex *dfdphi_d,
                                      cuDoubleComplex *dfeldphi_d, 
                    double Chom11, double Chom12, double Chom44, 
-                   double *hom_strain_v, double epszero_d,
+                   double *hom_strain_v0, double *hom_strain_v1, 
+                   double *hom_strain_v2, double epszero_d,
                    int ny_d, int nz_d)
 {
 
@@ -231,9 +221,9 @@ __global__ void Compute_dfeldphi_hom(cuDoubleComplex *ux_d,
    estr[1]  = (epszero_d)*hphi;
    estr[2]  = (epszero_d)*hphi;
  
-   hstr[0]  = hom_strain_v[0];
-   hstr[1]  = hom_strain_v[1];
-   hstr[2]  = hom_strain_v[2];
+   hstr[0]  = *hom_strain_v0;
+   hstr[1]  = *hom_strain_v1;
+   hstr[2]  = *hom_strain_v2;
 
    dfeldphi_d[idx].x = 
                 Chom11*
@@ -267,12 +257,16 @@ __global__ void Compute_dfeldphi_hom(cuDoubleComplex *ux_d,
      dfeldphi_d[idx].y = 0.0; 
 } 
 
-__global__ void Find_hom_strain(double *hom_strain_v, double *sigappl_v_d, double *S11_d, 
-                                double *S12_d, double *S44_d)
+__global__ void Find_hom_strain(double *hom_strain_v0, double *hom_strain_v1, 
+                                double *hom_strain_v2, double *sigappl_v_d, 
+                                double *S11_d, double *S12_d, double *S44_d)
 {
-	hom_strain_v[0] += (*S11_d)*(sigappl_v_d[0])+ (*S12_d)*(sigappl_v_d[1] + sigappl_v_d[2]);
-	hom_strain_v[1] += (*S11_d)*(sigappl_v_d[1])+ (*S12_d)*(sigappl_v_d[0] + sigappl_v_d[2]);
-	hom_strain_v[2] += (*S11_d)*(sigappl_v_d[2])+ (*S12_d)*(sigappl_v_d[0] + sigappl_v_d[1]);
+	*hom_strain_v0 += (*S11_d)*(sigappl_v_d[0])+ 
+                          (*S12_d)*(sigappl_v_d[1] + sigappl_v_d[2]);
+	*hom_strain_v1 += (*S11_d)*(sigappl_v_d[1])+ 
+                          (*S12_d)*(sigappl_v_d[0] + sigappl_v_d[2]);
+	*hom_strain_v2 += (*S11_d)*(sigappl_v_d[2])+ 
+                          (*S12_d)*(sigappl_v_d[0] + sigappl_v_d[1]);
 } 
 
 void HomElast(void){
@@ -280,45 +274,38 @@ void HomElast(void){
    int              complex_size;
    void             *t_storage = NULL;
    size_t           t_storage_bytes = 0;
-   double           *hom_strain_v;
-   cublasStatus_t    stat;
-   checkCudaErrors(cudaMalloc((void**)&hom_strain_v, 3*sizeof(double)));
-   checkCudaErrors(cudaMalloc(&t_storage, t_storage_bytes));
+   double           *dummy;
+   double           *hom_strain_v0, *hom_strain_v1, *hom_strain_v2;
+   //cublasStatus_t    stat;
+
+   checkCudaErrors(cudaMalloc((void**)&hom_strain_v0, sizeof(double)));
+   checkCudaErrors(cudaMalloc((void**)&hom_strain_v1, sizeof(double)));
+   checkCudaErrors(cudaMalloc((void**)&hom_strain_v2, sizeof(double)));
+   checkCudaErrors(cudaMalloc((void**)&dummy, nx*ny*nz*sizeof(double)));
+   //checkCudaErrors(cudaMalloc(&t_storage, t_storage_bytes));
 
    /*cub::DeviceReduce::Sum(t_storage, t_storage_bytes, ux_d,
                           hom_strain_v[0], nx*ny*nz);*/
 
-   complex_size = sizeof(cufftDoubleComplex)*nx*ny*nz;
+   //complex_size = sizeof(cufftDoubleComplex)*nx*ny*nz;
  
    //save eigen strain ux_d, uy_d and uz_d 
-   Compute_eigstr_hom<<<Gridsize,Blocksize>>>(ux_d, uy_d, uz_d, 
-                                              dfdphi_d, epszero, ny, nz);
+   Compute_eigstr_hom<<<Gridsize,Blocksize>>>(dummy,dfdphi_d,epszero, ny, nz);
+
+   cub::DeviceReduce::Sum(t_storage, t_storage_bytes, dummy,
+                          hom_strain_v0, nx*ny*nz);
+   cudaFree(dummy);
+   checkCudaErrors(cudaMemcpy(hom_strain_v1, hom_strain_v0,
+             sizeof(double), cudaMemcpyDeviceToDevice));
+
+   checkCudaErrors(cudaMemcpy(hom_strain_v2, hom_strain_v0,
+             sizeof(double), cudaMemcpyDeviceToDevice));
    
-   stat = cublasCreate(&blas_handle); 
-   if (stat != CUBLAS_STATUS_SUCCESS) {
-      printf ("CUBLAS initialization failed\n");
-      exit(EXIT_FAILURE);
-   }
+   Find_volumeAvg_eigstr<<<1,1>>>(hom_strain_v0, hom_strain_v1, hom_strain_v2, 
+                                  sizescale);
 
-   stat = cublasDzasum(blas_handle, nx*ny*nz, ux_d, 1, &hom_strain_v[0]);
-   stat = cublasDzasum(blas_handle, nx*ny*nz, uy_d, 1, &hom_strain_v[1]);
-   stat = cublasDzasum(blas_handle, nx*ny*nz, uz_d, 1, &hom_strain_v[2]);
-
-   if (stat != CUBLAS_STATUS_SUCCESS) {
-      printf ("CUBLAS sum failed\n");
-      exit(EXIT_FAILURE);
-   }
-   //Sum of eigen strain 
-   /*cub::DeviceReduce::Sum(t_storage, t_storage_bytes, ux_d,
-                          hom_strain_v[0], nx*ny*nz);
-   cub::DeviceReduce::Sum(t_storage, t_storage_bytes, uy_d,
-                          hom_strain_v[1], nx*ny*nz);
-   cub::DeviceReduce::Sum(t_storage, t_storage_bytes, uz_d,
-                          hom_strain_v[2], nx*ny*nz);
-   */ 
-   Find_volumeAvg_eigstr<<<1,1>>>(hom_strain_v, sizescale);
-
-   Find_hom_strain<<<1,1>>>(hom_strain_v, sigappl_v_d, S11_d, S12_d, S44_d); 
+   Find_hom_strain<<<1,1>>>(hom_strain_v0, hom_strain_v1, hom_strain_v2, 
+                            sigappl_v_d, S11_d, S12_d, S44_d); 
 
    //Save eigen stress in ux_d, uy_d and uz_d 
    Compute_eigsts_hom<<<Gridsize,Blocksize >>>(ux_d, uy_d, uz_d, 
@@ -355,8 +342,13 @@ void HomElast(void){
 
    Compute_dfeldphi_hom<<< Gridsize, Blocksize>>>
                       (ux_d, uy_d, uz_d, dfdphi_d, dfeldphi_d, Chom11, Chom12,
-                       Chom44, hom_strain_v, epszero, ny, nz);
+                       Chom44, hom_strain_v0, hom_strain_v1, hom_strain_v2, 
+                       epszero, ny, nz);
 
-   cublasDestroy(blas_handle);
+   //cublasDestroy(blas_handle);
+
+   cudaFree(hom_strain_v0);
+   cudaFree(hom_strain_v1);
+   cudaFree(hom_strain_v2);
 
 }

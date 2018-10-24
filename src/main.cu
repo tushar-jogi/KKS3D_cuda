@@ -7,11 +7,12 @@ int main (int argc, char*argv[])
     void Init_Conf ();
     void Evolve ();
     void Usage(void);
+     
 
     size_t  complex_size, double_size, float_size, complex_size_elast;
     char finput[15] = "bin1ary";
     char fnin[30]="InputParams", fnout[30]="OutParams";
-
+    FILE *fp; 
     if (argc > 1){
     	for (int i=0; i<argc; i++){
 
@@ -34,27 +35,26 @@ int main (int argc, char*argv[])
     }
     else{
       Usage();
+    
+
+    if (!(fp = fopen (finput, "r"))) {
+      printf ("File:%s could not be opened\n", finput);
+      exit (EXIT_FAILURE);
+    }
+    if(fscanf (fp, "%s", fnin)==1){
+      printf("Input Parameters Filename:%s\n",fnin);
+    }
+    if(fscanf (fp, "%s", fnout)==1){
+      printf("Output Parameters Filename:%s\n",fnout);
+    }
+    if (!(fpout = fopen (fnout, "w"))) {
+      printf ("File:%s could not be opened\n", fnout);
       exit (EXIT_FAILURE);
     }
 
-    //if (!(fp = fopen (finput, "r"))) {
-    //  printf ("File:%s could not be opened\n", finput);
-    //  exit (EXIT_FAILURE);
-    //}
-    //if(fscanf (fp, "%s", fnin)==1){
-    //  printf("Input Parameters Filename:%s\n",fnin);
-    //}
-    //if(fscanf (fp, "%s", fnout)==1){
-    //  printf("Output Parameters Filename:%s\n",fnout);
-    //}
-    //if (!(fpout = fopen (fnout, "w"))) {
-    //  printf ("File:%s could not be opened\n", fnout);
-    //  exit (EXIT_FAILURE);
-   // }
-
-    //fclose (fp);
-    //fclose (fpout);
-
+    fclose (fp);
+    fclose (fpout);
+    }
     //Reading simulation parameters
     Get_Input_Parameters (fnin, fnout);
     
