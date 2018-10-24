@@ -84,10 +84,10 @@ int main (int argc, char*argv[])
     //Allocation of elasticity varaibles
     if (elast_int == 1){
 
-      checkCudaErrors(cudaMalloc((void**)&ux_d, complex_size_elast));
-      checkCudaErrors(cudaMalloc((void**)&uy_d, complex_size_elast));
-      checkCudaErrors(cudaMalloc((void**)&uz_d, complex_size_elast));
-      checkCudaErrors(cudaMalloc((void**)&dfeldphi_d, complex_size_elast));
+      checkCudaErrors(cudaMalloc((void**)&ux_d, complex_size));
+      checkCudaErrors(cudaMalloc((void**)&uy_d, complex_size));
+      checkCudaErrors(cudaMalloc((void**)&uz_d, complex_size));
+      checkCudaErrors(cudaMalloc((void**)&dfeldphi_d, complex_size));
 
     }
 
@@ -126,8 +126,8 @@ int main (int argc, char*argv[])
     cudaFree (kz_d);
     cudaFree (dfdphi_d);
 
-    cudaFree(ppt_size_d );
-    cudaFree(sigappl_v_d );
+    cudaFree(ppt_size_d);
+    cudaFree(sigappl_v_d);
 
     if (elast_int == 1){
 

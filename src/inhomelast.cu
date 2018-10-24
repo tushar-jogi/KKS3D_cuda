@@ -341,7 +341,7 @@ __global__ void Compute_persts5(double Chom44_d, double Chet44_d,
 
 __global__ void Compute_homstr(double *hom_strain_v, double *S11_d, 
                                double *S12_d, double *S44_d, 
-                               double *sigappl_v_d, double *avgeigsts0,
+                              double *sigappl_v_d, double *avgeigsts0,
                                double *avgeigsts1, double *avgeigsts2,
                                double *avgpersts0, double *avgpersts1,
                                double *avgpersts2, double *avgpersts3,
@@ -370,9 +370,6 @@ __global__ void Compute_ts(double Chom11_d, double Chom12_d,
                            double Chom44_d, double Chet11_d, 
                            double Chet12_d, double Chet44_d,
                     cuDoubleComplex *dfdphi_d, 
-                    cuDoubleComplex *ts0_d, cuDoubleComplex *ts1_d,
-                    cuDoubleComplex *ts2_d, cuDoubleComplex *ts3_d,
-                    cuDoubleComplex *ts4_d, cuDoubleComplex *ts5_d,
                     cuDoubleComplex *str_v0_d, cuDoubleComplex *str_v1_d,
                     cuDoubleComplex *str_v2_d, cuDoubleComplex *str_v3_d,
                     cuDoubleComplex *str_v4_d, cuDoubleComplex *str_v5_d,
@@ -409,42 +406,42 @@ __global__ void Compute_ts(double Chom11_d, double Chom12_d,
   temp_v[4] = str_v4_d[idx].x;
   temp_v[5] = str_v5_d[idx].x;
 
-  ts0_d[idx].x = Ct11*(eig[0]-(hom_strain_v[0]))-
-                 Cin11*temp_v[0]+
-                 Ct12*(eig[1]-(hom_strain_v[1]))-
-                 Cin12*temp_v[1]+
-                 Ct12*(eig[2]-(hom_strain_v[2]))-
-                 Cin12*temp_v[2];
+  str_v0_d[idx].x = Ct11*(eig[0]-(hom_strain_v[0]))-
+                    Cin11*temp_v[0]+
+                    Ct12*(eig[1]-(hom_strain_v[1]))-
+                    Cin12*temp_v[1]+
+                    Ct12*(eig[2]-(hom_strain_v[2]))-
+                    Cin12*temp_v[2];
 
-  ts1_d[idx].x = Ct12*(eig[0]-(hom_strain_v[0]))-
-                 Cin12*temp_v[0]+
-                 Ct11*(eig[1]-(hom_strain_v[1]))-
-                 Cin11*temp_v[1]+
-                 Ct12*(eig[2]-(hom_strain_v[2]))-
-                 Cin12*temp_v[2];
+  str_v1_d[idx].x = Ct12*(eig[0]-(hom_strain_v[0]))-
+                    Cin12*temp_v[0]+
+                    Ct11*(eig[1]-(hom_strain_v[1]))-
+                    Cin11*temp_v[1]+
+                    Ct12*(eig[2]-(hom_strain_v[2]))-
+                    Cin12*temp_v[2];
 
-  ts2_d[idx].x = Ct12*(eig[0]-(hom_strain_v[0]))-
-                 Cin12*temp_v[0]+
-                 Ct12*(eig[1]-(hom_strain_v[1]))-
-                 Cin12*temp_v[1]+
-                 Ct11*(eig[2]-(hom_strain_v[2]))-
-                 Cin11*temp_v[2];
+  str_v2_d[idx].x = Ct12*(eig[0]-(hom_strain_v[0]))-
+                    Cin12*temp_v[0]+
+                    Ct12*(eig[1]-(hom_strain_v[1]))-
+                    Cin12*temp_v[1]+
+                    Ct11*(eig[2]-(hom_strain_v[2]))-
+                       Cin11*temp_v[2];
 
-  ts3_d[idx].x = Ct44*(-1.0*(hom_strain_v[3]))-
-                 Cin44*temp_v[3];
+  str_v3_d[idx].x = Ct44*(-1.0*(hom_strain_v[3]))-
+                    Cin44*temp_v[3];
 
-  ts4_d[idx].x = Ct44*(-1.0*(hom_strain_v[4]))-
-                 Cin44*temp_v[4];
+  str_v4_d[idx].x = Ct44*(-1.0*(hom_strain_v[4]))-
+                    Cin44*temp_v[4];
 
-  ts5_d[idx].x = Ct44*(-1.0*(hom_strain_v[5]))-
-                 Cin44*temp_v[5];
+  str_v5_d[idx].x = Ct44*(-1.0*(hom_strain_v[5]))-
+                    Cin44*temp_v[5];
             
-  ts0_d[idx].y = 0.0;
-  ts1_d[idx].y = 0.0;
-  ts2_d[idx].y = 0.0;
-  ts3_d[idx].y = 0.0;
-  ts4_d[idx].y = 0.0;
-  ts5_d[idx].y = 0.0;
+  str_v0_d[idx].y = 0.0;
+  str_v1_d[idx].y = 0.0;
+  str_v2_d[idx].y = 0.0;
+  str_v3_d[idx].y = 0.0;
+  str_v4_d[idx].y = 0.0;
+  str_v5_d[idx].y = 0.0;
 }
 
 __global__ void Update_disp(int ny_d, int nz_d, 
@@ -756,18 +753,11 @@ void InhomElast (void){
   checkCudaErrors(cudaMalloc((void**)&str_v4_d, complex_size));
   checkCudaErrors(cudaMalloc((void**)&str_v5_d, complex_size));
 
-  checkCudaErrors(cudaMalloc((void**)&unewx_d, complex_size));
-  checkCudaErrors(cudaMalloc((void**)&unewy_d, complex_size));
-  checkCudaErrors(cudaMalloc((void**)&unewz_d, complex_size));
+  checkCudaErrors(cudaMalloc((void**) &unewx_d, complex_size));
+  checkCudaErrors(cudaMalloc((void**) &unewy_d, complex_size));
+  checkCudaErrors(cudaMalloc((void**) &unewz_d, complex_size));
 
-  checkCudaErrors(cudaMalloc((void**)&ts0_d, complex_size));
-  checkCudaErrors(cudaMalloc((void**)&ts1_d, complex_size));
-  checkCudaErrors(cudaMalloc((void**)&ts2_d, complex_size));
-  checkCudaErrors(cudaMalloc((void**)&ts3_d, complex_size));
-  checkCudaErrors(cudaMalloc((void**)&ts4_d, complex_size));
-  checkCudaErrors(cudaMalloc((void**)&ts5_d, complex_size));
-
-  checkCudaErrors(cudaMalloc((void**)&dummy, double_size)); 
+  checkCudaErrors(cudaMalloc((void**) &dummy, double_size)); 
 
   checkCudaErrors(cudaMalloc((void**)&Cavg11, sizeof(double))); 
   checkCudaErrors(cudaMalloc((void**)&Cavg12, sizeof(double))); 
@@ -936,22 +926,21 @@ void InhomElast (void){
       //Finding ts
       Compute_ts<<<Gridsize, Blocksize>>>(Chom11, Chom12, Chom44, 
                                           Chet11, Chet12, Chet44, 
-                                          dfdphi_d, ts0_d, ts1_d, ts2_d, ts3_d,
-                                          ts4_d, ts5_d, str_v0_d, str_v1_d,
+                                          dfdphi_d, str_v0_d, str_v1_d,
                                           str_v2_d, str_v3_d, str_v4_d, 
                                           str_v5_d, hom_strain_v , epszero, 
                                           ny, nz);
 
-      cufftExecZ2Z(elast_plan, ts0_d, ts0_d, CUFFT_FORWARD);
-      cufftExecZ2Z(elast_plan, ts1_d, ts1_d, CUFFT_FORWARD);
-      cufftExecZ2Z(elast_plan, ts2_d, ts2_d, CUFFT_FORWARD);
-      cufftExecZ2Z(elast_plan, ts3_d, ts3_d, CUFFT_FORWARD);
-      cufftExecZ2Z(elast_plan, ts4_d, ts4_d, CUFFT_FORWARD);
-      cufftExecZ2Z(elast_plan, ts5_d, ts5_d, CUFFT_FORWARD);
+      cufftExecZ2Z(elast_plan, str_v0_d, str_v0_d, CUFFT_FORWARD);
+      cufftExecZ2Z(elast_plan, str_v1_d, str_v1_d, CUFFT_FORWARD);
+      cufftExecZ2Z(elast_plan, str_v2_d, str_v2_d, CUFFT_FORWARD);
+      cufftExecZ2Z(elast_plan, str_v3_d, str_v3_d, CUFFT_FORWARD);
+      cufftExecZ2Z(elast_plan, str_v4_d, str_v4_d, CUFFT_FORWARD);
+      cufftExecZ2Z(elast_plan, str_v5_d, str_v5_d, CUFFT_FORWARD);
    
       //Update displacements
       Update_disp<<< Gridsize,Blocksize >>>(ny, nz, kx_d, ky_d, kz_d, 
-              ts0_d, ts1_d, ts2_d, ts3_d, ts4_d, ts5_d, 
+              str_v0_d, str_v1_d, str_v2_d, str_v3_d, str_v4_d, str_v5_d, 
               unewx_d, unewy_d, unewz_d, Chom11, Chom12, Chom44);
 
       // Finding periodic strains
@@ -959,9 +948,9 @@ void InhomElast (void){
               unewx_d, unewy_d, unewz_d, str_v0_d, str_v1_d, str_v2_d,
               str_v3_d, str_v4_d, str_v5_d);
 
-      cufftExecZ2Z(plan, unewx_d, unewx_d, CUFFT_INVERSE);
-      cufftExecZ2Z(plan, unewy_d, unewy_d, CUFFT_INVERSE);
-      cufftExecZ2Z(plan, unewz_d, unewz_d, CUFFT_INVERSE);
+      cufftExecZ2Z(plan, unewx_d, unewx_d,   CUFFT_INVERSE);
+      cufftExecZ2Z(plan, unewy_d, unewy_d,   CUFFT_INVERSE);
+      cufftExecZ2Z(plan, unewz_d, unewz_d,   CUFFT_INVERSE);
 
       cufftExecZ2Z(plan, str_v0_d, str_v0_d, CUFFT_INVERSE);
       cufftExecZ2Z(plan, str_v1_d, str_v1_d, CUFFT_INVERSE);
@@ -1059,12 +1048,6 @@ void InhomElast (void){
   cudaFree(unewx_d);
   cudaFree(unewy_d);
   cudaFree(unewz_d);
-  cudaFree(ts0_d);
-  cudaFree(ts1_d);
-  cudaFree(ts2_d);
-  cudaFree(ts3_d);
-  cudaFree(ts4_d);
-  cudaFree(ts5_d);
   cudaFree(avgeigsts0);
   cudaFree(avgeigsts1);
   cudaFree(avgeigsts2);

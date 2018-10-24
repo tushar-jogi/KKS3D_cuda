@@ -2,7 +2,7 @@ SHELL = /bin/sh
 NVCC = nvcc   
 COMPOPS = -Xptxas -O3 
 ARCH = -arch=sm_60
-LIBS =  -lcufft -lcuda -lcudart
+LIBS =  -lcufft -lcuda -lcudart -lcublas
 INCS =  -I/usr/local/cuda-9.1/samples/common/inc   
 HEADERS = include/binary.h
 

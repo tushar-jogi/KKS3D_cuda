@@ -264,7 +264,7 @@ void Evolve(void)
   void Output_Conf (int steps);
   void Calc_uzero(void);
   void InhomElast(void);
-  //void HomElast(void);
+  void HomElast(void);
   int       loop_condition, count;
   double    *kx, *ky, *kz;
   double    *tempreal_d;
@@ -392,33 +392,34 @@ void Evolve(void)
       //Finding elastic driving force in real space
     if (elast_int == 1 && count >= time_elast ){
 
-      if (count == initcount)
+      if (inhom == 1){
+        if (count == initcount)
         Calc_uzero();
-      //if (inhom == 1)
         InhomElast();
-      //else
-       // HomElast();
+      }
+      else
+        HomElast();
     }
 
 
     ComputeGradphi<<< Gridsize, Blocksize >>>(kx_d, ky_d, kz_d, 
-                                              nx, ny, nz, 
-                                              phi_d, gradphix_d, gradphiy_d, 
-                                              gradphiz_d);
+                                       nx, ny, nz, 
+                                       phi_d, gradphix_d, gradphiy_d, 
+                                       gradphiz_d);
 
     cufftExecZ2Z(plan, gradphix_d, gradphix_d, CUFFT_INVERSE);
     cufftExecZ2Z(plan, gradphiy_d, gradphiy_d, CUFFT_INVERSE);
     cufftExecZ2Z(plan, gradphiz_d, gradphiz_d, CUFFT_INVERSE);
     
-    Normalize<<< Gridsize, Blocksize >>>(gradphix_d, sizescale, ny, nz);
-    Normalize<<< Gridsize, Blocksize >>>(gradphiy_d, sizescale, ny, nz);
-    Normalize<<< Gridsize, Blocksize >>>(gradphiz_d, sizescale, ny, nz);
+    Normalize<<<Gridsize,Blocksize >>>(gradphix_d, sizescale, ny, nz);
+    Normalize<<<Gridsize,Blocksize >>>(gradphiy_d, sizescale, ny, nz);
+    Normalize<<<Gridsize,Blocksize >>>(gradphiz_d, sizescale, ny, nz);
     
-    ComputeDrivForce<<< Gridsize, Blocksize >>>(comp_d, dfdphi_d, 
-                                           gradphix_d, gradphiy_d, gradphiz_d, 
-                                           f0AVminv, f0BVminv, c_beta_eq, 
-                                           c_alpha_eq, diffusivity, 
-                                           w, ny, nz);
+    ComputeDrivForce<<<Gridsize, Blocksize >>>(comp_d, dfdphi_d, 
+                                  gradphix_d, gradphiy_d, gradphiz_d, 
+                                  f0AVminv, f0BVminv, c_beta_eq, 
+                                  c_alpha_eq, diffusivity, 
+                                  w, ny, nz);
 
     if (cufftExecZ2Z(plan,gradphix_d, gradphix_d,CUFFT_FORWARD) != CUFFT_SUCCESS)
        printf("fft failed\n");
@@ -451,18 +452,14 @@ void Evolve(void)
     cudaMemcpy(&comp_at_corner,comp_d,sizeof(cufftDoubleComplex),
                 cudaMemcpyDeviceToHost);
 
-    if (fabs(Re(comp_at_corner) - c0) >= 1.0e-01)
-    {
-	printf("Growth condition has vanished!!!!\n");
-        exit(0);
-    }
+    //if (fabs(Re(comp_at_corner) - c0) >= 1.0e-01)
+    //{
+    //	printf("Growth condition has vanished!!!!\n");
+    //    exit(0);
+    //}
 
     cub::DeviceReduce::Max(t_storage, t_storage_bytes, tempreal_d, maxerr_d, 
                            nx*ny*nz);       
-
-    if (loop_condition == 0)
-      printf("Simulation Converged");
-
     cudaDeviceSynchronize();
 
     checkCudaErrors(cudaMemcpy(&maxerror, maxerr_d, sizeof(double),
@@ -493,3 +490,4 @@ void Evolve(void)
 #include "out_conf.cu"
 #include "calc_uzero.cu"
 #include "inhomelast.cu"
+#include "homelast.cu"

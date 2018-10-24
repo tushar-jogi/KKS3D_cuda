@@ -87,8 +87,8 @@ void Output_Conf (int steps)
  fclose(fpt2);
  }*/
 
- sprintf (fn, "prof_gp.%06d", steps);
- sprintf (fn1,"1Dprof.%06d",steps);
+ sprintf (fn, "prof_gp.%07d", steps);
+ sprintf (fn1,"1Dprof.%07d",steps);
 
  fpt = fopen (fn, "w");
  fpt2 = fopen (fn1, "w");
