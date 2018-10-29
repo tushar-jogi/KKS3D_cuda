@@ -1,7 +1,7 @@
 SHELL = /bin/sh
 NVCC = nvcc   
-#COMPOPS = -Xptxas -O3 
-COMPOPS = -Xptxas -g  
+COMPOPS = -Xptxas -O3 
+#COMPOPS = -Xptxas -g  
 #COMPOPS =   
 ARCH = -arch=sm_60 
 LIBS =  -lcufft -lcuda -lcudart 
