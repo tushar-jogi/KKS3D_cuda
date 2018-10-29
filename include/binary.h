@@ -91,8 +91,6 @@ double     wn, T, Ln, En, Tn;
 
 FILE       *fpout;
 double     dkx, dky, dkz;
-double     *kx, *ky, *kz;
-double     *kx_d, *ky_d, *kz_d;
 double     epszero, *epszero_d;
 double     sizescale, *sizescale_d;
 double     sigappl_v[6], *sigappl_v_d;
@@ -101,12 +99,10 @@ double     mu_m, nu_m, Az_m;
 double     mu_p, nu_p, Az_p;
 double     Cp[6][6], Cm[6][6];
 double     Chom11, Chom12, Chom44; 
-double     *Chom11_d, *Chom12_d, *Chom44_d; 
 double     Chet11, Chet12, Chet44;
-double     *Chet11_d, *Chet12_d, *Chet44_d;
 double     *S11_d, *S12_d, *S44_d;
 double     S11, S12, S44;
-                          
+double     *dummy;                          
 cufftDoubleComplex *ux_d,*uy_d,*uz_d;
 cufftDoubleComplex *unewx_d,*unewy_d,*unewz_d;
 cufftDoubleComplex *str_v0_d, *str_v1_d, *str_v2_d, 

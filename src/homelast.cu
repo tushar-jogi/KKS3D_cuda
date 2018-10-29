@@ -23,7 +23,7 @@ __global__ void Compute_eigstr_hom(double *eigstr0,
 
   int idx = k + (nz_d)*(j + i*(ny_d));
 
-  double eig11, eig22, eig33, hphi, e_temp;
+  double hphi, e_temp;
   
   e_temp = dfdphi_d[idx].x;
 
@@ -160,8 +160,9 @@ __global__ void Compute_Sij_hom(double *Cavg11, double *Cavg12, double *Cavg44,
 
 }*/
 
-__global__ void Compute_perstr(int ny, int nz, cuDoubleComplex *ux_d, cuDoubleComplex *uy_d, 
-                               cuDoubleComplex *uz_d, double *kx_d, double *ky_d, double *kz_d)
+__global__ void Compute_perstr(int nx, int ny, int nz, cuDoubleComplex *ux_d, 
+                               cuDoubleComplex *uy_d, cuDoubleComplex *uz_d, 
+                               double dkx, double dky, double dkz)
 {
 	
   int i = threadIdx.x + blockDim.x*blockIdx.x;
@@ -169,14 +170,30 @@ __global__ void Compute_perstr(int ny, int nz, cuDoubleComplex *ux_d, cuDoubleCo
   int k = threadIdx.z + blockDim.z*blockIdx.z;
 
   int idx = k + (nz)*(j + i*(ny));
+  double n[3];
 
-  ux_d[idx].x = -1.0*kx_d[i]*ux_d[idx].y;
-  uy_d[idx].x = -1.0*ky_d[j]*uy_d[idx].y;
-  uz_d[idx].x = -1.0*kz_d[k]*uz_d[idx].y;
+  if (i < nx/2) 
+     n[0] = (double) i * dkx;
+  else 
+     n[0] = (double)(i-nx) * dkx;
 
-  ux_d[idx].y = kx_d[i]*ux_d[idx].x;
-  uy_d[idx].y = ky_d[j]*uy_d[idx].x;
-  uz_d[idx].y = kz_d[k]*uz_d[idx].x;
+  if (j < ny/2) 
+     n[1] = (double) j * dky;
+  else 
+     n[1] = (double)(j-ny) * dky;
+
+  if (k < nz/2) 
+     n[2] = (double) k * dkz;
+  else 
+     n[2] = (double)(k-nz) * dkz;
+
+  ux_d[idx].x = -1.0*n[0]*ux_d[idx].y;
+  uy_d[idx].x = -1.0*n[1]*uy_d[idx].y;
+  uz_d[idx].x = -1.0*n[2]*uz_d[idx].y;
+
+  ux_d[idx].y = n[0]*ux_d[idx].x;
+  uy_d[idx].y = n[1]*uy_d[idx].x;
+  uz_d[idx].y = n[2]*uz_d[idx].x;
    
   
 }
@@ -254,7 +271,8 @@ __global__ void Compute_dfeldphi_hom(cuDoubleComplex *ux_d,
                 (hstr[2]+str_v[2]-estr[2])*
                 (epszero_d)*hphi_p;
 
-     dfeldphi_d[idx].y = 0.0; 
+   dfeldphi_d[idx].y = 0.0;  
+
 } 
 
 __global__ void Find_hom_strain(double *hom_strain_v0, double *hom_strain_v1, 
@@ -271,30 +289,27 @@ __global__ void Find_hom_strain(double *hom_strain_v0, double *hom_strain_v1,
 
 void HomElast(void){
 
-   int              complex_size;
    void             *t_storage = NULL;
    size_t           t_storage_bytes = 0;
-   double           *dummy;
+   //double           *dummy;
    double           *hom_strain_v0, *hom_strain_v1, *hom_strain_v2;
    //cublasStatus_t    stat;
 
    checkCudaErrors(cudaMalloc((void**)&hom_strain_v0, sizeof(double)));
    checkCudaErrors(cudaMalloc((void**)&hom_strain_v1, sizeof(double)));
    checkCudaErrors(cudaMalloc((void**)&hom_strain_v2, sizeof(double)));
-   checkCudaErrors(cudaMalloc((void**)&dummy, nx*ny*nz*sizeof(double)));
-   //checkCudaErrors(cudaMalloc(&t_storage, t_storage_bytes));
-
-   /*cub::DeviceReduce::Sum(t_storage, t_storage_bytes, ux_d,
-                          hom_strain_v[0], nx*ny*nz);*/
-
-   //complex_size = sizeof(cufftDoubleComplex)*nx*ny*nz;
- 
-   //save eigen strain ux_d, uy_d and uz_d 
-   Compute_eigstr_hom<<<Gridsize,Blocksize>>>(dummy,dfdphi_d,epszero, ny, nz);
+   //checkCudaErrors(cudaMalloc((void**)&dummy, nx*ny*nz*sizeof(double)));
 
    cub::DeviceReduce::Sum(t_storage, t_storage_bytes, dummy,
                           hom_strain_v0, nx*ny*nz);
-   cudaFree(dummy);
+
+ 
+   //save eigen strain ux_d, uy_d and uz_d 
+   Compute_eigstr_hom<<<Gridsize,Blocksize>>>(dummy,dfdphi_d,epszero,ny,nz);
+
+   cub::DeviceReduce::Sum(t_storage, t_storage_bytes, dummy,
+                          hom_strain_v0, nx*ny*nz);
+   //cudaFree(dummy);
    checkCudaErrors(cudaMemcpy(hom_strain_v1, hom_strain_v0,
              sizeof(double), cudaMemcpyDeviceToDevice));
 
@@ -324,13 +339,13 @@ void HomElast(void){
   /**********************************************************
    *                 Zeroth order displacement              *
    **********************************************************/ 
-   Compute_uzero<<< Gridsize, Blocksize >>>(ny, nz, 
-                          ux_d, uy_d, uz_d, kx_d, 
-                          ky_d, kz_d, ux_d, uy_d, uz_d,
+   Compute_uzero<<< Gridsize, Blocksize >>>(nx, ny, nz, 
+                          ux_d, uy_d, uz_d, dkx, 
+                          dky, dkz, ux_d, uy_d, uz_d,
                           Chom11, Chom12, Chom44);
 
    
-   Compute_perstr<<<Gridsize, Blocksize>>>(ny, nz, ux_d, uy_d, uz_d, kx_d, ky_d, kz_d);
+   Compute_perstr<<<Gridsize, Blocksize>>>(nx, ny, nz, ux_d, uy_d, uz_d, dkx, dky, dkz);
 
    cufftExecZ2Z(plan, ux_d, ux_d, CUFFT_INVERSE);
    cufftExecZ2Z(plan, uy_d, uy_d, CUFFT_INVERSE);
@@ -340,12 +355,11 @@ void HomElast(void){
    Normalize<<<Gridsize,Blocksize >>>(uy_d, sizescale, ny, nz); 
    Normalize<<<Gridsize,Blocksize >>>(uz_d, sizescale, ny, nz); 
 
+   //Saving elastic driving force in dummy
    Compute_dfeldphi_hom<<< Gridsize, Blocksize>>>
-                      (ux_d, uy_d, uz_d, dfdphi_d, dfeldphi_d, Chom11, Chom12,
+                      (ux_d, uy_d, uz_d, dfdphi_d, ux_d, Chom11, Chom12,
                        Chom44, hom_strain_v0, hom_strain_v1, hom_strain_v2, 
                        epszero, ny, nz);
-
-   //cublasDestroy(blas_handle);
 
    cudaFree(hom_strain_v0);
    cudaFree(hom_strain_v1);

@@ -62,10 +62,10 @@ __global__ void Initialize_disp(cufftDoubleComplex *ux_d,
 
 }
 
-__global__ void Compute_uzero(int ny_d, int nz_d, 
+__global__ void Compute_uzero(int nx_d, int ny_d, int nz_d, 
                           cufftDoubleComplex *ux_d, cufftDoubleComplex *uy_d,
-                          cufftDoubleComplex *uz_d, double *kx_d, double *ky_d,
-                          double *kz_d, cufftDoubleComplex *eigsts00, 
+                          cufftDoubleComplex *uz_d, double dkx, double dky,
+                          double dkz, cufftDoubleComplex *eigsts00, 
                           cufftDoubleComplex *eigsts10, 
                           cufftDoubleComplex *eigsts20,
                           double Chom11_d, double Chom12_d, double Chom44_d)
@@ -82,9 +82,20 @@ __global__ void Compute_uzero(int ny_d, int nz_d,
   double               omega[6];
   cufftDoubleComplex   eig_v[3], fk10, fk20, fk30;
   
-  nk[0] = (double)kx_d[i];
-  nk[1] = (double)ky_d[j];
-  nk[2] = (double)kz_d[k];
+  if (i < nx_d/2) 
+     nk[0] = (double) i * dkx;
+  else 
+     nk[0] = (double)(i-nx_d) * dkx;
+
+  if (j < ny_d/2) 
+     nk[1] = (double) j * dky;
+  else 
+     nk[1] = (double)(j-ny_d) * dky;
+
+  if (k < nz_d/2) 
+     nk[2] = (double) j * dkz;
+  else 
+     nk[2] = (double)(j-nz_d) * dkz;
 
   invomega_v[0] = (Chom11_d)*nk[0]*nk[0] + (Chom44_d)*nk[1]*nk[1] +
                   (Chom44_d)*nk[2]*nk[2];
@@ -178,15 +189,10 @@ __global__ void Compute_uzero(int ny_d, int nz_d,
 
 void Calc_uzero(void){
 
-   int complex_size;
 
-   complex_size = sizeof(cufftDoubleComplex)*nx*ny*nz;
-
-   cudaMalloc((void**)&eigsts00, complex_size);
-   cudaMalloc((void**)&eigsts10, complex_size);
-   cudaMalloc((void**)&eigsts20, complex_size);
-   
-   Compute_eigsts_hom<<< Gridsize,Blocksize >>>(eigsts00, eigsts10, eigsts20, 
+  
+   //Eigen stress saved in ux_d. uy_d and uz_d 
+   Compute_eigsts_hom<<< Gridsize,Blocksize >>>(ux_d, uy_d, uz_d, 
                                                 dfdphi_d, 
                                                 Chom11, Chom12, Chom44, 
                                                 epszero, ny, nz);
@@ -195,23 +201,19 @@ void Calc_uzero(void){
   *          Take eigenstress component to fourier space     * 
   ************************************************************/
 
-   cufftExecZ2Z(plan, eigsts00, eigsts00, CUFFT_FORWARD);
-   cufftExecZ2Z(plan, eigsts10, eigsts10, CUFFT_FORWARD);
-   cufftExecZ2Z(plan, eigsts20, eigsts20, CUFFT_FORWARD);
+   cufftExecZ2Z(plan, ux_d, ux_d, CUFFT_FORWARD);
+   cufftExecZ2Z(plan, uy_d, uy_d, CUFFT_FORWARD);
+   cufftExecZ2Z(plan, uz_d, uz_d, CUFFT_FORWARD);
  
 /************************************************************
 *                Initializing displacments                  *
 *************************************************************/
-   Initialize_disp<<< Gridsize, Blocksize>>>(ux_d, uy_d, uz_d, ny, nz);
+   //Initialize_disp<<< Gridsize, Blocksize>>>(ux_d, uy_d, uz_d, ny, nz);
 /**********************************************************
  *                 Zeroth order displacement              *
  **********************************************************/ 
-   Compute_uzero<<< Gridsize, Blocksize >>>(ny, nz, ux_d, uy_d, uz_d, kx_d, 
-                          ky_d, kz_d, eigsts00, eigsts10, eigsts20,
+   Compute_uzero<<< Gridsize, Blocksize >>>(nx, ny, nz, ux_d, uy_d, uz_d, dkx, 
+                          dky, dkz, ux_d, uy_d, uz_d,
                           Chom11, Chom12, Chom44);
-
-   cudaFree(eigsts00);
-   cudaFree(eigsts10);
-   cudaFree(eigsts20);
 
 }

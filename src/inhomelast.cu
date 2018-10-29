@@ -39,8 +39,8 @@ __global__ void Compute_Sij(double *Cavg11, double *Cavg12, double *Cavg44,
 
 }
 
-__global__ void Compute_perstr(int ny_d, int nz_d, double *kx_d, 
-                               double *ky_d, double *kz_d, 
+__global__ void Compute_perstr(int nx_d, int ny_d, int nz_d, double dkx, 
+                               double dky, double dkz, 
                          cuDoubleComplex *unewx_d, cuDoubleComplex *unewy_d,
                          cuDoubleComplex *unewz_d, cuDoubleComplex *str_v0_d,
                          cuDoubleComplex *str_v1_d, cuDoubleComplex *str_v2_d,
@@ -57,9 +57,20 @@ __global__ void Compute_perstr(int ny_d, int nz_d, double *kx_d,
 
   double  nk[3];
 
-  nk[0] = kx_d[i];
-  nk[1] = ky_d[j];
-  nk[2] = kz_d[k];
+  if (i < nx_d/2) 
+     nk[0] = (double) i * dkx;
+  else 
+     nk[0] = (double)(i-nx_d) * dkx;
+
+  if (j < ny_d/2) 
+     nk[1] = (double) j * dky;
+  else 
+     nk[1] = (double)(j-ny_d) * dky;
+
+  if (k < nz_d/2) 
+     nk[2] = (double) k * dkz;
+  else 
+     nk[2] = (double)(k-nz_d) * dkz;
 
   str_v0_d[idx].x = -1.0*unewx_d[idx].y*nk[0];
   str_v1_d[idx].x = -1.0*unewy_d[idx].y*nk[1];
@@ -444,8 +455,8 @@ __global__ void Compute_ts(double Chom11_d, double Chom12_d,
   str_v5_d[idx].y = 0.0;
 }
 
-__global__ void Update_disp(int ny_d, int nz_d, 
-                        double *kx_d, double *ky_d, double *kz_d, 
+__global__ void Update_disp(int nx_d, int ny_d, int nz_d, 
+                        double dkx, double dky, double dkz, 
                         cuDoubleComplex *ts0_d, cuDoubleComplex *ts1_d,
                         cuDoubleComplex *ts2_d, cuDoubleComplex *ts3_d, 
                         cuDoubleComplex *ts4_d, cuDoubleComplex *ts5_d,
@@ -466,9 +477,20 @@ __global__ void Update_disp(int ny_d, int nz_d,
   double        nk[3], omega[6];
   cufftComplex stmp_v[6], fk10, fk20, fk30;
 
-  nk[0] = kx_d[i];
-  nk[1] = ky_d[j];
-  nk[2] = kz_d[k];
+  if (i < nx_d/2) 
+     nk[0] = (double) i * dkx;
+  else 
+     nk[0] = (double)(i-nx_d) * dkx;
+
+  if (j < ny_d/2) 
+     nk[1] = (double) j * dky;
+  else 
+     nk[1] = (double)(j-ny_d) * dky;
+
+  if (k < nz_d/2) 
+     nk[2] = (double) k * dkz;
+  else 
+     nk[2] = (double)(k-nz_d) * dkz;
 
   invomega_v[0] = (Chom11_d)*nk[0]*nk[0] + (Chom44_d)*nk[1]*nk[1] +
                   (Chom44_d)*nk[2]*nk[2];
@@ -735,12 +757,12 @@ void InhomElast (void){
   double           *avgeigsts0, *avgeigsts1, *avgeigsts2;
   double           *avgpersts0, *avgpersts1, *avgpersts2;
   double           *avgpersts3, *avgpersts4, *avgpersts5;
-  double           *hom_strain_v, *dummy;
+  double           *hom_strain_v, *dummy2;
   double           *disperr_d;
   void             *t_storage = NULL;
   size_t           t_storage_bytes = 0;
 
-  cub::DeviceReduce::Sum(t_storage, t_storage_bytes, dummy,
+  cub::DeviceReduce::Sum(t_storage, t_storage_bytes, dummy2,
                          Cavg11, nx*ny*nz);
 
   complex_size = nx*ny*nz*sizeof(cufftDoubleComplex);
@@ -757,7 +779,7 @@ void InhomElast (void){
   checkCudaErrors(cudaMalloc((void**) &unewy_d, complex_size));
   checkCudaErrors(cudaMalloc((void**) &unewz_d, complex_size));
 
-  checkCudaErrors(cudaMalloc((void**) &dummy, double_size)); 
+  checkCudaErrors(cudaMalloc((void**) &dummy2, double_size)); 
 
   checkCudaErrors(cudaMalloc((void**)&Cavg11, sizeof(double))); 
   checkCudaErrors(cudaMalloc((void**)&Cavg12, sizeof(double))); 
@@ -783,17 +805,17 @@ void InhomElast (void){
   *     in Voight's form
   *----------------------------------------------------------------------*/
 
-  Compute_Ctotal<<< Gridsize, Blocksize>>>(dfdphi_d, ny, nz, dummy, 
+  Compute_Ctotal<<< Gridsize, Blocksize>>>(dfdphi_d, ny, nz, dummy2, 
                                            Chom11, Chet11); 
-  cub::DeviceReduce::Sum(t_storage, t_storage_bytes, dummy,
+  cub::DeviceReduce::Sum(t_storage, t_storage_bytes, dummy2,
                          Cavg11, nx*ny*nz);
-  Compute_Ctotal<<< Gridsize, Blocksize>>>(dfdphi_d, ny, nz, dummy, 
+  Compute_Ctotal<<< Gridsize, Blocksize>>>(dfdphi_d, ny, nz, dummy2, 
                                            Chom12, Chet12);
-  cub::DeviceReduce::Sum(t_storage, t_storage_bytes, dummy,
+  cub::DeviceReduce::Sum(t_storage, t_storage_bytes, dummy2,
                          Cavg12, nx*ny*nz);
-  Compute_Ctotal<<< Gridsize, Blocksize>>>(dfdphi_d, ny, nz, dummy, 
+  Compute_Ctotal<<< Gridsize, Blocksize>>>(dfdphi_d, ny, nz, dummy2, 
                                            Chom44, Chet44);
-  cub::DeviceReduce::Sum(t_storage, t_storage_bytes, dummy,
+  cub::DeviceReduce::Sum(t_storage, t_storage_bytes, dummy2,
                          Cavg44, nx*ny*nz);
 
  /*-----------------------------------------------------------------------
@@ -811,19 +833,19 @@ void InhomElast (void){
 
   //Finding eigen stress
   Compute_eigsts0<<<Gridsize, Blocksize>>>(Chom11, Chom12, Chet11, 
-                                           Chet12, dfdphi_d, dummy, 
+                                           Chet12, dfdphi_d, dummy2, 
                                            epszero, ny, nz);
-  cub::DeviceReduce::Sum(t_storage, t_storage_bytes, dummy, 
+  cub::DeviceReduce::Sum(t_storage, t_storage_bytes, dummy2, 
 			 avgeigsts0, nx*ny*nz);
   Compute_eigsts1<<<Gridsize, Blocksize>>>(Chom11, Chom12, Chet11, 
-                                           Chet12, dfdphi_d, dummy, 
+                                           Chet12, dfdphi_d, dummy2, 
                                            epszero,ny, nz);
-  cub::DeviceReduce::Sum(t_storage, t_storage_bytes, dummy, 
+  cub::DeviceReduce::Sum(t_storage, t_storage_bytes, dummy2, 
 			 avgeigsts1, nx*ny*nz);
   Compute_eigsts2<<<Gridsize, Blocksize>>>(Chom11, Chom12, Chet11, 
-                                           Chet12, dfdphi_d, dummy, 
+                                           Chet12, dfdphi_d, dummy2, 
                                            epszero,ny, nz);
-  cub::DeviceReduce::Sum(t_storage, t_storage_bytes, dummy, 
+  cub::DeviceReduce::Sum(t_storage, t_storage_bytes, dummy2, 
 			 avgeigsts2, nx*ny*nz);
 
   Average<<<1,1>>>(avgeigsts0, sizescale); 
@@ -834,7 +856,7 @@ void InhomElast (void){
   cufftExecZ2Z(elast_plan, uy_d, uy_d, CUFFT_FORWARD);
   cufftExecZ2Z(elast_plan, uz_d, uz_d, CUFFT_FORWARD);
 
-  Compute_perstr<<< Gridsize, Blocksize >>>(ny, nz, kx_d, ky_d, kz_d, 
+  Compute_perstr<<< Gridsize, Blocksize >>>(nx, ny, nz, dkx, dky, dkz, 
                                             ux_d, uy_d, uz_d, 
                                             str_v0_d, str_v1_d, str_v2_d,
                                             str_v3_d, str_v4_d, str_v5_d);
@@ -871,43 +893,43 @@ void InhomElast (void){
       Compute_persts0<<< Gridsize, Blocksize >>>(Chom11, Chom12, 
                                                Chet11, Chet12, dfdphi_d, 
                                                str_v0_d, str_v1_d, str_v2_d, 
-                                               dummy, ny, nz);
+                                               dummy2, ny, nz);
 
-      cub::DeviceReduce::Sum(t_storage, t_storage_bytes, dummy, 
+      cub::DeviceReduce::Sum(t_storage, t_storage_bytes, dummy2, 
 			 avgpersts0, nx*ny*nz);
 
       Compute_persts1<<< Gridsize, Blocksize >>>(Chom11, Chom12, 
                                                Chet11, Chet12, dfdphi_d, 
                                                str_v0_d, str_v1_d, str_v2_d, 
-                                               dummy, ny, nz);
+                                               dummy2, ny, nz);
 
-      cub::DeviceReduce::Sum(t_storage, t_storage_bytes, dummy, 
+      cub::DeviceReduce::Sum(t_storage, t_storage_bytes, dummy2, 
 			 avgpersts1, nx*ny*nz);
 
       Compute_persts2<<< Gridsize, Blocksize >>>(Chom11, Chom12, 
                                                Chet11, Chet12, dfdphi_d, 
                                                str_v0_d, str_v1_d, str_v2_d, 
-                                               dummy, ny, nz);
+                                               dummy2, ny, nz);
 
-      cub::DeviceReduce::Sum(t_storage, t_storage_bytes, dummy, 
+      cub::DeviceReduce::Sum(t_storage, t_storage_bytes, dummy2, 
 			 avgpersts2, nx*ny*nz);
 
       Compute_persts3<<< Gridsize, Blocksize >>>(Chom44, Chet44, dfdphi_d, 
-                     str_v3_d, dummy, ny, nz);
+                     str_v3_d, dummy2, ny, nz);
 
-      cub::DeviceReduce::Sum(t_storage, t_storage_bytes, dummy, 
+      cub::DeviceReduce::Sum(t_storage, t_storage_bytes, dummy2, 
 			 avgpersts3, nx*ny*nz);
 
       Compute_persts4<<< Gridsize, Blocksize >>>(Chom44, Chet44, dfdphi_d, 
-                     str_v4_d, dummy, ny, nz);
+                     str_v4_d, dummy2, ny, nz);
 
-      cub::DeviceReduce::Sum(t_storage, t_storage_bytes, dummy, 
+      cub::DeviceReduce::Sum(t_storage, t_storage_bytes, dummy2, 
 			 avgpersts4, nx*ny*nz);
 
       Compute_persts5<<< Gridsize, Blocksize >>>(Chom44, Chet44, dfdphi_d, 
-                     str_v5_d, dummy, ny, nz);
+                     str_v5_d, dummy2, ny, nz);
 
-      cub::DeviceReduce::Sum(t_storage, t_storage_bytes, dummy, 
+      cub::DeviceReduce::Sum(t_storage, t_storage_bytes, dummy2, 
 			 avgpersts5, nx*ny*nz);
 
       Average<<<1,1>>>(avgpersts0, sizescale);
@@ -939,12 +961,12 @@ void InhomElast (void){
       cufftExecZ2Z(elast_plan, str_v5_d, str_v5_d, CUFFT_FORWARD);
    
       //Update displacements
-      Update_disp<<< Gridsize,Blocksize >>>(ny, nz, kx_d, ky_d, kz_d, 
+      Update_disp<<< Gridsize,Blocksize >>>(nx, ny, nz, dkx, dky, dkz, 
               str_v0_d, str_v1_d, str_v2_d, str_v3_d, str_v4_d, str_v5_d, 
               unewx_d, unewy_d, unewz_d, Chom11, Chom12, Chom44);
 
       // Finding periodic strains
-      Compute_perstr<<< Gridsize, Blocksize >>>(ny, nz, kx_d, ky_d, kz_d, 
+      Compute_perstr<<< Gridsize, Blocksize >>>(nx, ny, nz, dkx, dky, dkz, 
               unewx_d, unewy_d, unewz_d, str_v0_d, str_v1_d, str_v2_d,
               str_v3_d, str_v4_d, str_v5_d);
 
@@ -974,9 +996,9 @@ void InhomElast (void){
       //unewx_d, unewy_d and unewz_d
       Compute_sq_diff_disp<<<Gridsize,Blocksize>>>(unewx_d, unewy_d, unewz_d, 
                                                    ux_d, uy_d, uz_d, 
-                                                   dummy, ny, nz);
+                                                   dummy2, ny, nz);
   
-      cub::DeviceReduce::Sum(t_storage, t_storage_bytes, dummy, 
+      cub::DeviceReduce::Sum(t_storage, t_storage_bytes, dummy2, 
 			 disperr_d, nx*ny*nz);
       cudaMemcpy(&disperror, disperr_d, sizeof(double), cudaMemcpyDeviceToHost);
       disperror = sqrt(disperror); 
@@ -998,32 +1020,32 @@ void InhomElast (void){
   Compute_persts0<<< Gridsize, Blocksize >>>(Chom11, Chom12, 
                                            Chet11, Chet12, dfdphi_d, 
                                            str_v0_d, str_v1_d, str_v2_d, 
-                                           dummy, ny, nz);
-  cub::DeviceReduce::Sum(t_storage, t_storage_bytes, dummy, 
+                                           dummy2, ny, nz);
+  cub::DeviceReduce::Sum(t_storage, t_storage_bytes, dummy2, 
 			 avgpersts0, nx*ny*nz);
   Compute_persts1<<< Gridsize, Blocksize >>>(Chom11, Chom12, 
                                            Chet11, Chet12, dfdphi_d, 
                                            str_v0_d, str_v1_d, str_v2_d, 
-                                           dummy, ny, nz);
-  cub::DeviceReduce::Sum(t_storage, t_storage_bytes, dummy, 
+                                           dummy2, ny, nz);
+  cub::DeviceReduce::Sum(t_storage, t_storage_bytes, dummy2, 
 			 avgpersts1, nx*ny*nz);
   Compute_persts2<<< Gridsize, Blocksize >>>(Chom11, Chom12, 
                                            Chet11, Chet12, dfdphi_d, 
                                            str_v0_d, str_v1_d, str_v2_d, 
-                                           dummy, ny, nz);
-  cub::DeviceReduce::Sum(t_storage, t_storage_bytes, dummy, 
+                                           dummy2, ny, nz);
+  cub::DeviceReduce::Sum(t_storage, t_storage_bytes, dummy2, 
 			 avgpersts2, nx*ny*nz);
   Compute_persts3<<< Gridsize, Blocksize>>>(Chom44, Chet44, dfdphi_d, 
-                   str_v3_d, dummy, ny, nz);
-  cub::DeviceReduce::Sum(t_storage, t_storage_bytes, dummy, 
+                   str_v3_d, dummy2, ny, nz);
+  cub::DeviceReduce::Sum(t_storage, t_storage_bytes, dummy2, 
 			 avgpersts3, nx*ny*nz);
   Compute_persts4<<< Gridsize, Blocksize >>>(Chom44, Chet44, dfdphi_d, 
-                   str_v4_d, dummy, ny, nz);
-  cub::DeviceReduce::Sum(t_storage, t_storage_bytes, dummy, 
+                   str_v4_d, dummy2, ny, nz);
+  cub::DeviceReduce::Sum(t_storage, t_storage_bytes, dummy2, 
 			 avgpersts4, nx*ny*nz);
   Compute_persts5<<< Gridsize, Blocksize >>>(Chom44, Chet44, dfdphi_d, 
-                   str_v5_d, dummy, ny, nz);
-  cub::DeviceReduce::Sum(t_storage, t_storage_bytes, dummy, 
+                   str_v5_d, dummy2, ny, nz);
+  cub::DeviceReduce::Sum(t_storage, t_storage_bytes, dummy2, 
 			 avgpersts5, nx*ny*nz);
 
   Compute_homstr<<<1,1>>>(hom_strain_v, S11_d, S12_d, S44_d, sigappl_v_d,
@@ -1057,7 +1079,7 @@ void InhomElast (void){
   cudaFree(avgpersts3);
   cudaFree(avgpersts4);
   cudaFree(avgpersts5);
-  cudaFree(dummy);
+  cudaFree(dummy2);
   cudaFree(hom_strain_v);
   cudaFree(Cavg11);
   cudaFree(Cavg12);

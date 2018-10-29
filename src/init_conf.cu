@@ -182,6 +182,7 @@ void Init_Conf(void)
 
    void   Read_Restart();
    double ran(long *idum);
+
    //Finding Grid size
    Num_of_blocks = (nx*ny*nz)/(NUM_THREADS_X*NUM_THREADS_Y*NUM_THREADS_Z);
 
@@ -300,7 +301,30 @@ void Init_Conf(void)
         } 
         cudaFree(overlap);
         cudaFree(occupancy);
-     }         
+     }
+     //Generate precipitate of critical nucleus size at center of box         
+     else if (create_nuclei == 2){
+
+
+        double centx, centy, centz;
+
+        centx = nx/2;
+        centy = ny/2;
+        centz = nz/2;
+
+        FindCriticalNucleus<<<1, 1>>>(f0A, Vm, c0, c_alpha_eq,
+                                      c_beta_eq, mu_m, mu_p, nu_m, nu_p, 
+                                      epszero, ppt_size_d, interface_energy, 
+                                      elast_int);
+
+        checkCudaErrors(cudaMemcpy(&ppt_size, ppt_size_d,
+              sizeof(double), cudaMemcpyDeviceToHost));
+
+        printf("Nondimensional precipitate radius = %lf\n",ppt_size/dx);
+        CreateNuclei<<<Gridsize,Blocksize>>>(nx, ny, nz, centx, centy, centz, 
+                                             ppt_size, comp_d, phi_d, dfdphi_d,
+                                             c_beta_eq, c0);
+     }
                 
    }
    if (initflag == 0){

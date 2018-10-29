@@ -1,5 +1,6 @@
+#define HOM_PROBLEM
 
-__global__ void  ComputeGradphi(double *kx_d, double *ky_d, double *kz_d,
+__global__ void  ComputeGradphi(double dkx, double dky, double dkz,
                                 int nx_d, int ny_d, int nz_d,
                                 cuDoubleComplex *phi_d,
                                 cuDoubleComplex *gradphix_d, 
@@ -12,12 +13,24 @@ __global__ void  ComputeGradphi(double *kx_d, double *ky_d, double *kz_d,
   int k = threadIdx.z + blockIdx.z * blockDim.z;
 
   int idx = k + (nz_d)*(j + i*(ny_d));
-
+  
   double  n[3];
 
-  n[0] = kx_d[i];
-  n[1] = ky_d[j];
-  n[2] = kz_d[k];
+  if (i < nx_d/2) 
+     n[0] = (double) i * dkx;
+  else 
+     n[0] = (double)(i-nx_d) * dkx;
+
+  if (j < ny_d/2) 
+     n[1] = (double) j * dky;
+  else 
+     n[1] = (double)(j-ny_d) * dky;
+
+  if (k < nz_d/2) 
+     n[2] = (double) k * dkz;
+  else 
+     n[2] = (double)(k-nz_d) * dkz;
+
 
   gradphix_d[idx].x = -1.0*n[0]*phi_d[idx].y;  
   gradphix_d[idx].y = n[0]*phi_d[idx].x;  
@@ -105,14 +118,13 @@ __global__ void ComputeDrivForce(cuDoubleComplex *comp_d,
   __syncthreads();
 
 }
-/*
 __global__ void  ComputeDfdc(cuDoubleComplex *dfdc_d, 
                              cuDoubleComplex *varmobx_d, 
                              cuDoubleComplex *varmoby_d, 
                              cuDoubleComplex *varmobz_d,
                              int nx_d, int ny_d, int nz_d, 
-                             double *kx_d, double *ky_d, 
-                             double *kz_d)
+                             double dkx, double dky, 
+                             double dkz)
 {
 
   int i = threadIdx.x + blockIdx.x*blockDim.x;
@@ -120,32 +132,44 @@ __global__ void  ComputeDfdc(cuDoubleComplex *dfdc_d,
   int k = threadIdx.z + blockIdx.z*blockDim.z;
 
   int idx = k + (nz_d)*(j + i*(ny_d));
-  double  n[3];
+  double  n[3], uy_real;
 
-  n[0] = kx_d[i];
-  n[1] = ky_d[j];
-  n[2] = kz_d[k];
+  if (i < nx_d/2) 
+     n[0] = (double) i * dkx;
+  else 
+     n[0] = (double)(i-nx_d) * dkx;
+
+  if (j < ny_d/2) 
+     n[1] = (double) j * dky;
+  else 
+     n[1] = (double)(j-ny_d) * dky;
+
+  if (k < nz_d/2) 
+     n[2] = (double) k * dkz;
+  else 
+     n[2] = (double)(k-nz_d) * dkz;
+
+  uy_real = dfdc_d[idx].x;
 
   dfdc_d[idx].x = -1.0*(n[0]*varmobx_d[idx].y + 
                         n[1]*varmoby_d[idx].y +
                         n[2]*varmobz_d[idx].y); 
  
   dfdc_d[idx].y = (n[0]*varmobx_d[idx].x + 
-                   n[1]*varmoby_d[idx].x +
+                   n[1]*uy_real +
                    n[2]*varmobz_d[idx].x);
   
   __syncthreads();    
 
 }
-*/
 __global__ void Update_comp_phi (cuDoubleComplex *comp_d, 
                                  cuDoubleComplex *phi_d, 
                                  cuDoubleComplex *dfdphi_d,
                                  cuDoubleComplex *dfeldphi_d, 
                                  cuDoubleComplex *gradphix_d,
                                  cuDoubleComplex *gradphiy_d, 
-                                 cuDoubleComplex *gradphiz_d, double *kx_d, 
-                                 double *ky_d, double *kz_d, double dt_d,
+                                 cuDoubleComplex *gradphiz_d, double dkx, 
+                                 double dky, double dkz, double dt_d,
                                  double diffusivity_d, double kappa_phi_d, 
                                  double relax_coeff_d, int elast_int_d, 
                                  int nx_d, int ny_d, int nz_d)
@@ -159,20 +183,34 @@ __global__ void Update_comp_phi (cuDoubleComplex *comp_d,
 
   double           kpow2, lhs, lhse;
   cuDoubleComplex  rhs, rhse; 
- 
-  kpow2 = kx_d[i]*kx_d[i] + ky_d[j]*ky_d[j] + kz_d[k]*kz_d[k];
+  double  n[3];
+
+  if (i < nx_d/2) 
+     n[0] = (double) i * dkx;
+  else 
+     n[0] = (double)(i-nx_d) * dkx;
+
+  if (j < ny_d/2) 
+     n[1] = (double) j * dky;
+  else 
+     n[1] = (double)(j-ny_d) * dky;
+
+  if (k < nz_d/2) 
+     n[2] = (double) k * dkz;
+  else 
+     n[2] = (double)(k-nz_d) * dkz;
+
+  kpow2 = n[0]*n[0] + n[1]*n[1] + n[2]*n[2];
 
   lhs = 1.0 + (diffusivity_d)*kpow2*(dt_d);   
 
-  rhs.x = comp_d[idx].x + (dt_d)*(-1.0*(kx_d[i]*gradphix_d[idx].y +
-                                        ky_d[j]*gradphiy_d[idx].y +
-                                        kz_d[k]*gradphiz_d[idx].y));
-  rhs.y = comp_d[idx].y + (dt_d)*(kx_d[i]*gradphix_d[idx].x +
-                                  ky_d[j]*gradphiy_d[idx].x + 
-                                  kz_d[k]*gradphiz_d[idx].x);
+  rhs.x = comp_d[idx].x + (dt_d)*(-1.0*(n[0]*gradphix_d[idx].y +
+                                        n[1]*gradphiy_d[idx].y +
+                                        n[2]*gradphiz_d[idx].y));
+  rhs.y = comp_d[idx].y + (dt_d)*(n[0]*gradphix_d[idx].x +
+                                  n[1]*gradphiy_d[idx].x + 
+                                  n[2]*gradphiz_d[idx].x);
 
-  //rhs.x = comp_d[idx].x + (dt_d)*dfdc_d[idx].x;
-  //rhs.y = comp_d[idx].y + (dt_d)*dfdc_d[idx].y;
   comp_d[idx].x = rhs.x/lhs; 
   comp_d[idx].y = rhs.y/lhs;
   
@@ -200,7 +238,6 @@ __global__ void Update_comp_phi (cuDoubleComplex *comp_d,
 
   dfdphi_d[idx].x = phi_d[idx].x;
   dfdphi_d[idx].y = phi_d[idx].y;
- 
 
 }
 
@@ -259,15 +296,29 @@ __global__ void Find_err_matrix(double *temp, cuDoubleComplex *comp_d,
   temp[idx] = fabs(comp_d[idx].x - temp[idx]);
   
 }    
+__global__ void Save_ElastDriv(cuDoubleComplex *ux_d, double *dummy, int ny, int nz)
+{
+  int i = threadIdx.x + blockIdx.x*blockDim.x;
+  int j = threadIdx.y + blockIdx.y*blockDim.y;
+  int k = threadIdx.z + blockIdx.z*blockDim.z;
+  
+  int idx = k + (nz)*(j + i*(ny));
+
+  ux_d[idx].x = dummy[idx];	
+  ux_d[idx].y = 0.0;
+  
+  __syncthreads();	
+}
+
 void Evolve(void)
 {
-  void Output_Conf (int steps);
-  void Calc_uzero(void);
-  void InhomElast(void);
-  void HomElast(void);
+  //Function declarations
+  void      Output_Conf (int steps);
+  void      Calc_uzero(void);
+  void      InhomElast(void);
+  void      HomElast(void);
+
   int       loop_condition, count;
-  double    *kx, *ky, *kz;
-  double    *tempreal_d;
   double    maxerror, *maxerr_d;
   double    f0AVminv, f0BVminv;
   void      *t_storage = NULL;
@@ -275,7 +326,7 @@ void Evolve(void)
   size_t    complex_size, double_size;
   cufftDoubleComplex    comp_at_corner;
 
-  cub::DeviceReduce::Max(t_storage, t_storage_bytes, tempreal_d, maxerr_d,
+  cub::DeviceReduce::Max(t_storage, t_storage_bytes, dummy, maxerr_d,
                          nx*ny*nz);
 
   complex_size = nx*ny*nz*sizeof(cuDoubleComplex);
@@ -284,7 +335,7 @@ void Evolve(void)
   f0AVminv = f0A * (1.0/Vm) ;
   f0BVminv = f0B * (1.0/Vm) ;
 
-  checkCudaErrors(cudaMalloc((void**)&tempreal_d, double_size));
+  checkCudaErrors(cudaMalloc((void**)&dummy, double_size));
   checkCudaErrors(cudaMalloc((void**)&maxerr_d, sizeof(double)));
   checkCudaErrors(cudaMalloc((void**)&S11_d, sizeof(double)));
   checkCudaErrors(cudaMalloc((void**)&S12_d, sizeof(double)));
@@ -294,48 +345,13 @@ void Evolve(void)
   checkCudaErrors(cudaMemcpy(comp, comp_d, complex_size,
         cudaMemcpyDeviceToHost));
 
-  SaveReal<<< Gridsize, Blocksize >>>(tempreal_d, comp_d, ny, nz);
 
- //Fourier vectors: defined in host and copied to device memory 
-  kx = (double*) malloc(nx*sizeof(double));
-  ky = (double*) malloc(ny*sizeof(double));
-  kz = (double*) malloc(nz*sizeof(double));
-
-  for (int i = 0 ; i < nx ; i++ ) {
-    if (i < nx/2) 
-      kx[i] = (double) i * dkx;
-    else 
-      kx[i] = (double)(i-nx) * dkx;
-  } 
-
-  for (int j = 0; j < ny; j++){
-    if (j < ny/2)
-      ky[j] = (double)j * dky;
-    else
-      ky[j] = (double)(j-ny) * dky;
-  }
-
-  for (int k = 0; k < nz; k++){
-    if (k < nz/2)
-      kz[k] = (double)k * dkz;
-    else
-      kz[k] = (double)(k-nz) * dkz;
-  }
-
-  checkCudaErrors(cudaMemcpy(kx_d, kx, nx*sizeof(double),
-        cudaMemcpyHostToDevice));
-  checkCudaErrors(cudaMemcpy(ky_d, ky, ny*sizeof(double),
-        cudaMemcpyHostToDevice));
-  checkCudaErrors(cudaMemcpy(kz_d, kz, nz*sizeof(double),
-        cudaMemcpyHostToDevice));
-
+if (elast_int == 0 || inhom == 1){
   checkCudaErrors(cudaMalloc((void**)&gradphix_d, complex_size));
   checkCudaErrors(cudaMalloc((void**)&gradphiy_d, complex_size));
   checkCudaErrors(cudaMalloc((void**)&gradphiz_d, complex_size));
+}
 
-  free(kx);
-  free(ky);
-  free(kz);
 
   if (inhom != 1){
 
@@ -400,45 +416,92 @@ void Evolve(void)
       else
         HomElast();
     }
+  
+    //For homogeneous case gradphi is saved in ux_d, uy_d and uz_d.
+    if (inhom == 1 || elast_int == 0){
+      SaveReal<<< Gridsize, Blocksize >>>(dummy, comp_d, ny, nz);
 
+      ComputeGradphi<<< Gridsize, Blocksize >>>(dkx, dky, dkz, 
+                                                nx, ny, nz, 
+                                                phi_d, gradphix_d, gradphiy_d, 
+                                                gradphiz_d);
 
-    ComputeGradphi<<< Gridsize, Blocksize >>>(kx_d, ky_d, kz_d, 
-                                       nx, ny, nz, 
-                                       phi_d, gradphix_d, gradphiy_d, 
-                                       gradphiz_d);
+      cufftExecZ2Z(plan, gradphix_d, gradphix_d, CUFFT_INVERSE);
+      cufftExecZ2Z(plan, gradphiy_d, gradphiy_d, CUFFT_INVERSE);
+      cufftExecZ2Z(plan, gradphiz_d, gradphiz_d, CUFFT_INVERSE);
+    
+      Normalize<<<Gridsize,Blocksize >>>(gradphix_d, sizescale, ny, nz);
+      Normalize<<<Gridsize,Blocksize >>>(gradphiy_d, sizescale, ny, nz);
+      Normalize<<<Gridsize,Blocksize >>>(gradphiz_d, sizescale, ny, nz);
+    
+      ComputeDrivForce<<<Gridsize, Blocksize >>>(comp_d, dfdphi_d, 
+                                    gradphix_d, gradphiy_d, gradphiz_d, 
+                                    f0AVminv, f0BVminv, c_beta_eq, 
+                                    c_alpha_eq, diffusivity, 
+                                    w, ny, nz);
 
-    cufftExecZ2Z(plan, gradphix_d, gradphix_d, CUFFT_INVERSE);
-    cufftExecZ2Z(plan, gradphiy_d, gradphiy_d, CUFFT_INVERSE);
-    cufftExecZ2Z(plan, gradphiz_d, gradphiz_d, CUFFT_INVERSE);
+      if (cufftExecZ2Z(plan,gradphix_d, gradphix_d,CUFFT_FORWARD) != CUFFT_SUCCESS)
+          printf("fft failed\n");
+      if (cufftExecZ2Z(plan,gradphiy_d, gradphiy_d,CUFFT_FORWARD) != CUFFT_SUCCESS)
+          printf("fft failed\n");
+      if (cufftExecZ2Z(plan,gradphiz_d, gradphiz_d,CUFFT_FORWARD) != CUFFT_SUCCESS)
+          printf("fft failed\n");
     
-    Normalize<<<Gridsize,Blocksize >>>(gradphix_d, sizescale, ny, nz);
-    Normalize<<<Gridsize,Blocksize >>>(gradphiy_d, sizescale, ny, nz);
-    Normalize<<<Gridsize,Blocksize >>>(gradphiz_d, sizescale, ny, nz);
+      cufftExecZ2Z(plan, comp_d,     comp_d, CUFFT_FORWARD);
+      cufftExecZ2Z(plan, dfdphi_d, dfdphi_d, CUFFT_FORWARD);
     
-    ComputeDrivForce<<<Gridsize, Blocksize >>>(comp_d, dfdphi_d, 
-                                  gradphix_d, gradphiy_d, gradphiz_d, 
-                                  f0AVminv, f0BVminv, c_beta_eq, 
-                                  c_alpha_eq, diffusivity, 
-                                  w, ny, nz);
+      if (elast_int == 1 && count > time_elast)
+        cufftExecZ2Z(plan, dfeldphi_d, dfeldphi_d, CUFFT_FORWARD);
+    
+      Update_comp_phi<<< Gridsize, Blocksize >>>(comp_d, phi_d, dfdphi_d,
+                                   dfeldphi_d, gradphix_d, gradphiy_d, 
+                                   gradphiz_d, dkx, dky, dkz, dt,
+                                   diffusivity, kappa_phi, relax_coeff,
+                                   elast_int, nx, ny, nz);
+    }
+    else 
+    {
+	
+      ComputeGradphi<<< Gridsize, Blocksize >>>(dkx, dky, dkz, 
+                                                nx, ny, nz, 
+                                                phi_d, ux_d, uy_d, 
+                                                uz_d);
 
-    if (cufftExecZ2Z(plan,gradphix_d, gradphix_d,CUFFT_FORWARD) != CUFFT_SUCCESS)
-       printf("fft failed\n");
-    if (cufftExecZ2Z(plan,gradphiy_d, gradphiy_d,CUFFT_FORWARD) != CUFFT_SUCCESS)
-       printf("fft failed\n");
-    if (cufftExecZ2Z(plan,gradphiz_d, gradphiz_d,CUFFT_FORWARD) != CUFFT_SUCCESS)
-       printf("fft failed\n");
+      cufftExecZ2Z(plan, ux_d, ux_d, CUFFT_INVERSE);
+      cufftExecZ2Z(plan, uy_d, uy_d, CUFFT_INVERSE);
+      cufftExecZ2Z(plan, uz_d, uz_d, CUFFT_INVERSE);
     
-    cufftExecZ2Z(plan, comp_d,     comp_d, CUFFT_FORWARD);
-    cufftExecZ2Z(plan, dfdphi_d, dfdphi_d, CUFFT_FORWARD);
+      Normalize<<<Gridsize,Blocksize >>>(ux_d, sizescale, ny, nz);
+      Normalize<<<Gridsize,Blocksize >>>(uy_d, sizescale, ny, nz);
+      Normalize<<<Gridsize,Blocksize >>>(uz_d, sizescale, ny, nz);
     
-    if (elast_int == 1 && count > time_elast)
-      cufftExecZ2Z(plan, dfeldphi_d, dfeldphi_d, CUFFT_FORWARD);
+      ComputeDrivForce<<<Gridsize, Blocksize >>>(comp_d, dfdphi_d, 
+                                    ux_d, uy_d, uz_d, 
+                                    f0AVminv, f0BVminv, c_beta_eq, 
+                                    c_alpha_eq, diffusivity, 
+                                    w, ny, nz);
+
+      if (cufftExecZ2Z(plan, ux_d, ux_d, CUFFT_FORWARD) != CUFFT_SUCCESS)
+          printf("fft failed\n");
+      if (cufftExecZ2Z(plan, uy_d, uy_d, CUFFT_FORWARD) != CUFFT_SUCCESS)
+          printf("fft failed\n");
+      if (cufftExecZ2Z(plan, uz_d, uz_d, CUFFT_FORWARD) != CUFFT_SUCCESS)
+          printf("fft failed\n");
+
+      SaveReal<<< Gridsize, Blocksize >>>(dummy, comp_d, ny, nz);
+
+      cufftExecZ2Z(plan, comp_d,     comp_d, CUFFT_FORWARD);
+      cufftExecZ2Z(plan, dfdphi_d, dfdphi_d, CUFFT_FORWARD);
     
-    Update_comp_phi<<< Gridsize, Blocksize >>>(comp_d, phi_d, dfdphi_d,
-                                 dfeldphi_d, gradphix_d, gradphiy_d, 
-                                 gradphiz_d, kx_d, ky_d, kz_d, dt,
-                                 diffusivity, kappa_phi, relax_coeff,
-                                 elast_int, nx, ny, nz);
+      if (elast_int == 1 && count > time_elast)
+        cufftExecZ2Z(plan, dfeldphi_d, dfeldphi_d, CUFFT_FORWARD);
+    
+      Update_comp_phi<<< Gridsize, Blocksize >>>(comp_d, phi_d, dfdphi_d,
+                                   dfeldphi_d, ux_d, uy_d, 
+                                   uz_d, dkx, dky, dkz, dt,
+                                   diffusivity, kappa_phi, relax_coeff,
+                                   elast_int, nx, ny, nz);
+    } 
 
     cufftExecZ2Z(plan, comp_d,     comp_d, CUFFT_INVERSE);
     cufftExecZ2Z(plan, dfdphi_d, dfdphi_d, CUFFT_INVERSE);
@@ -446,19 +509,13 @@ void Evolve(void)
     Normalize<<< Gridsize, Blocksize >>>(comp_d,   sizescale, ny, nz);
     Normalize<<< Gridsize, Blocksize >>>(dfdphi_d, sizescale, ny, nz);
 
-    //save difference between new and old composition in tempreal_d
-    Find_err_matrix<<< Gridsize, Blocksize >>>(tempreal_d, comp_d, ny, nz);
+    //save difference between new and old composition in dummy
+    Find_err_matrix<<< Gridsize, Blocksize >>>(dummy, comp_d, ny, nz);
 
     cudaMemcpy(&comp_at_corner,comp_d,sizeof(cufftDoubleComplex),
                 cudaMemcpyDeviceToHost);
 
-    //if (fabs(Re(comp_at_corner) - c0) >= 1.0e-01)
-    //{
-    //	printf("Growth condition has vanished!!!!\n");
-    //    exit(0);
-    //}
-
-    cub::DeviceReduce::Max(t_storage, t_storage_bytes, tempreal_d, maxerr_d, 
+    cub::DeviceReduce::Max(t_storage, t_storage_bytes, dummy, maxerr_d, 
                            nx*ny*nz);       
     cudaDeviceSynchronize();
 
@@ -469,22 +526,27 @@ void Evolve(void)
       printf("Microstructure converged\n");
       loop_condition = 0;      
     }
+
     sim_time = sim_time + dt;
 
-    SaveReal <<<Gridsize,Blocksize>>> (tempreal_d, comp_d, ny, nz);
+    SaveReal <<<Gridsize,Blocksize>>> (dummy, comp_d, ny, nz);
 
     iteration = iteration + 1;
   }//time loop ends
 
-  cudaFree(tempreal_d);
+  cudaFree(dummy);
   cudaFree(maxerr_d);
   cudaFree(t_storage);
   cudaFree(S11_d);
   cudaFree(S12_d);
   cudaFree(S44_d);
-  cudaFree(gradphix_d);
-  cudaFree(gradphiy_d);
-  cudaFree(gradphiz_d);
+
+  if (inhom ==1 ){
+     cudaFree(gradphix_d);
+     cudaFree(gradphiy_d);
+     cudaFree(gradphiz_d);
+  }
+
 }
 
 #include "out_conf.cu"

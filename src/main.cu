@@ -9,7 +9,7 @@ int main (int argc, char*argv[])
     void Usage(void);
      
 
-    size_t  complex_size, double_size, float_size, complex_size_elast;
+    size_t  complex_size;
     char finput[15] = "bin1ary";
     char fnin[30]="InputParams", fnout[30]="OutParams";
     FILE *fp; 
@@ -68,9 +68,6 @@ int main (int argc, char*argv[])
 
     //sizes of complex and double variables
     complex_size = nx*ny*nz*sizeof(cuDoubleComplex);
-    complex_size_elast = nx*ny*nz*sizeof(cufftComplex);
-    double_size  = nx*ny*nz*sizeof(double);
-    float_size   = nx*ny*nz*sizeof(float);
 
     //Allocation of global variables
     comp     = (cuDoubleComplex*) malloc (complex_size);
@@ -79,24 +76,15 @@ int main (int argc, char*argv[])
     checkCudaErrors(cudaMalloc((void**)&comp_d, complex_size));
     checkCudaErrors(cudaMalloc((void**)&phi_d, complex_size));
     checkCudaErrors(cudaMalloc((void**)&dfdphi_d, complex_size));
-    checkCudaErrors(cudaMalloc((void**)&dfdc_d, complex_size));
 
-    //Allocation of elasticity varaibles
-    if (elast_int == 1){
-
-      checkCudaErrors(cudaMalloc((void**)&ux_d, complex_size));
-      checkCudaErrors(cudaMalloc((void**)&uy_d, complex_size));
-      checkCudaErrors(cudaMalloc((void**)&uz_d, complex_size));
-      checkCudaErrors(cudaMalloc((void**)&dfeldphi_d, complex_size));
-
-    }
-
+  if (elast_int == 1){
+     checkCudaErrors(cudaMallocManaged((void**)&ux_d, complex_size));
+     checkCudaErrors(cudaMallocManaged((void**)&uy_d, complex_size));
+     checkCudaErrors(cudaMallocManaged((void**)&uz_d, complex_size));
+     checkCudaErrors(cudaMallocManaged((void**)&dfeldphi_d, complex_size));
+  }
     //Generating initial profile
     Init_Conf();
-
-    checkCudaErrors(cudaMalloc((void**)&kx_d, nx*sizeof(double)));
-    checkCudaErrors(cudaMalloc((void**)&ky_d, ny*sizeof(double)));
-    checkCudaErrors(cudaMalloc((void**)&kz_d, nz*sizeof(double)));
 
     kappa_phi = 3.0/(2.0*alpha) *(interface_energy*Ln);
     printf("Kappa phi = %lf\n", kappa_phi);
@@ -110,7 +98,7 @@ int main (int argc, char*argv[])
 
     //Declaring fft plan
     cufftPlan3d(&plan, nx, ny, nz, CUFFT_Z2Z); 
-    cufftPlan3d(&elast_plan, nx, ny, nz, CUFFT_C2C); 
+    cufftPlan3d(&elast_plan, nx, ny, nz, CUFFT_Z2Z); 
 
     cudaDeviceSynchronize();
     //call to evolve
@@ -120,10 +108,6 @@ int main (int argc, char*argv[])
     free (dfdphi);
     cudaFree (comp_d);
     cudaFree (phi_d);
-    cudaFree (dfdc_d);
-    cudaFree (kx_d);
-    cudaFree (ky_d);
-    cudaFree (kz_d);
     cudaFree (dfdphi_d);
 
     cudaFree(ppt_size_d);
