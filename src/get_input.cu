@@ -19,27 +19,26 @@ void Get_Input_Parameters (char *fnin, char *fnout)
  if(fscanf (fpin, "%s%d", param,&nx));
  if(fscanf (fpin, "%s%d", param,&ny));
  if(fscanf (fpin, "%s%d", param,&nz));
- if(fscanf (fpin, "%s%le",param,&dx));
- if(fscanf (fpin, "%s%le",param,&dy));
- if(fscanf (fpin, "%s%le",param,&dz));
+ if(fscanf (fpin, "%s%lf",param,&dx));
+ if(fscanf (fpin, "%s%lf",param,&dy));
+ if(fscanf (fpin, "%s%lf",param,&dz));
  if(fscanf (fpin, "%s%le",param,&Ln));
  if(fscanf (fpin, "%s%le",param,&interface_energy));
  if(fscanf (fpin, "%s%le",param,&diffusivity));
  if(fscanf (fpin, "%s%le",param,&relax_coeff));
  if(fscanf (fpin, "%s%le",param,&dt));
- if(fscanf (fpin, "%s%le",param,&T));
  if(fscanf (fpin, "%s%d", param,&num_steps));
  if(fscanf (fpin, "%s%le%s%le%s%le%s%lf", param, &f0A, param, &f0B, param, 
              &Vm, param, &alpha));
  if(fscanf (fpin, "%s%le%s%le" , param , &c_alpha_eq , param , &c_beta_eq));
- if(fscanf (fpin, "%s%lf",param,&c0));
+ if(fscanf (fpin, "%s%le",param,&c0));
  if(fscanf (fpin, "%s%lf%s%lf",param,&ppt_size, param, &vf));
  if(fscanf (fpin, "%s%le%s%le%s%le", param, &mu_m, param, &nu_m, param,
              &Az_m));
  if(fscanf (fpin, "%s%le%s%le%s%le", param, &mu_p, param, &nu_p, param,
              &Az_p));
- if(fscanf (fpin, "%s%e", param, &epszero ));
- if(fscanf (fpin, "%s%e%e%e%e%e%e",param,&sigappl_v[0],&sigappl_v[1],
+ if(fscanf (fpin, "%s%le", param, &epszero ));
+ if(fscanf (fpin, "%s%le%le%le%le%le%le",param,&sigappl_v[0],&sigappl_v[1],
             &sigappl_v[2],&sigappl_v[3],&sigappl_v[4],&sigappl_v[5]));
  if(fscanf (fpin, "%s%d", param,&create_nuclei));
  if(fscanf (fpin, "%s%d", param,&t_prof1));
@@ -48,7 +47,6 @@ void Get_Input_Parameters (char *fnin, char *fnout)
  if(fscanf (fpin, "%s%d", param,&numsteps_prof2));
  if(fscanf (fpin, "%s%d", param,&time_elast));
  if(fscanf (fpin, "%s%d", param,&elast_int));
- if(fscanf (fpin, "%s%d", param,&interpolation))
  if(fscanf (fpin, "%s%d", param,&initflag));
  if(fscanf (fpin, "%s%d", param,&initcount));
  fclose (fpin);

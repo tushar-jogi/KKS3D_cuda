@@ -701,13 +701,13 @@ __global__ void Compute_dfeldphi(cuDoubleComplex *str_v0_d,
                +2.0*(Chet12_d)*2.0*hphi_p*
                    (hstr[1]+str_v[1]-estr[1])
                   *(hstr[2]+str_v[2]-estr[2])
-               +(Chet44_d)*2.0*hphi_p*
+               +4.0*(Chet44_d)*2.0*hphi_p*
                    (hstr[3]+str_v[3])
                   *(hstr[3]+str_v[3])
-               +(Chet44_d)*2.0*hphi_p*
+               +4.0*(Chet44_d)*2.0*hphi_p*
                    (hstr[4]+str_v[4])
                   *(hstr[4]+str_v[4])
-               +(Chet44_d)*2.0*hphi_p*
+               +4.0*(Chet44_d)*2.0*hphi_p*
                    (hstr[5]+str_v[5])
                   *(hstr[5]+str_v[5])) -
                (

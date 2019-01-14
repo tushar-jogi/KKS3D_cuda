@@ -78,10 +78,10 @@ int main (int argc, char*argv[])
     checkCudaErrors(cudaMalloc((void**)&dfdphi_d, complex_size));
 
   if (elast_int == 1){
-     checkCudaErrors(cudaMallocManaged((void**)&ux_d, complex_size));
-     checkCudaErrors(cudaMallocManaged((void**)&uy_d, complex_size));
-     checkCudaErrors(cudaMallocManaged((void**)&uz_d, complex_size));
-     checkCudaErrors(cudaMallocManaged((void**)&dfeldphi_d, complex_size));
+     checkCudaErrors(cudaMalloc((void**)&ux_d, complex_size));
+     checkCudaErrors(cudaMalloc((void**)&uy_d, complex_size));
+     checkCudaErrors(cudaMalloc((void**)&uz_d, complex_size));
+     checkCudaErrors(cudaMalloc((void**)&dfeldphi_d, complex_size));
   }
     //Generating initial profile
     Init_Conf();

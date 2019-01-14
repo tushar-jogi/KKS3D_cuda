@@ -371,7 +371,7 @@ if (elast_int == 0 || inhom == 1){
   }
 
   if (cufftExecZ2Z(plan, phi_d, phi_d, CUFFT_FORWARD)!= CUFFT_SUCCESS)
-    printf("fft failed");
+    printf("fft of phi failed");
 
   cudaGetLastError();
 
@@ -482,11 +482,11 @@ if (elast_int == 0 || inhom == 1){
                                     w, ny, nz);
 
       if (cufftExecZ2Z(plan, ux_d, ux_d, CUFFT_FORWARD) != CUFFT_SUCCESS)
-          printf("fft failed\n");
+          printf("fft of gradphix failed\n");
       if (cufftExecZ2Z(plan, uy_d, uy_d, CUFFT_FORWARD) != CUFFT_SUCCESS)
-          printf("fft failed\n");
+          printf("fft of gradphiy failed\n");
       if (cufftExecZ2Z(plan, uz_d, uz_d, CUFFT_FORWARD) != CUFFT_SUCCESS)
-          printf("fft failed\n");
+          printf("fft of gradphiz failed\n");
 
       SaveReal<<< Gridsize, Blocksize >>>(dummy, comp_d, ny, nz);
 

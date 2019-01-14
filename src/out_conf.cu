@@ -1,11 +1,11 @@
 void Output_Conf (int steps)
 {
  FILE    *fpt, *fpt2;
- //int     gridcount=0;
+ int     gridcount=0;
  char    fn[100],fn1[100];
  double  min, max;
- //double  delta_cm, delta_cp;
- //double  k_bar,rad;
+ double  delta_cm, delta_cp;
+ double  k_bar,rad;
 
  sprintf (fn, "conf.%07d", steps);
 
@@ -51,7 +51,7 @@ void Output_Conf (int steps)
  
  //Finding c_alpha and c_beta at phi=0.5
  
- for (int i=nx/2;i<nx;i++){
+/* for (int i=nx/2;i<nx;i++){
      
      if (Re(dfdphi[ny/2 + i*ny]) <=0.5){
         x0 = i; 
@@ -60,7 +60,7 @@ void Output_Conf (int steps)
          x1 = i;
          break;
      }
- }
+ }*/
 
  for (int i = nx/2; i < nx; i++){
      
@@ -70,15 +70,15 @@ void Output_Conf (int steps)
      }   
  }
 
- delta_cp = comp[nz*(ny/2+(nx/2)*ny)].x - 1.0; 
+ delta_cp = comp[nz/2+nz*(ny/2+(nx/2)*ny)].x - 1.0; 
 
- x2 = x0 + 
-   ((x1-x0)/(Re(dfdphi[ny/2+(int)x1*ny]) - Re(dfdphi[ny/2+(int)x0*ny])))*
-   (0.5-Re(dfdphi[ny/2+(int)x0*ny]));
+ //x2 = x0 + 
+ //  ((x1-x0)/(Re(dfdphi[ny/2+(int)x1*ny]) - Re(dfdphi[ny/2+(int)x0*ny])))*
+//   (0.5-Re(dfdphi[ny/2+(int)x0*ny]));
 
- c_x2 = Re(comp[ny/2 + (int)x0*ny]) + 
-       ((Re(comp[ny/2+(int)x1*ny]) - Re(comp[ny/2+(int)x0*ny]))/(x1-x0))*
-       (x2 - x0);
+ //c_x2 = Re(comp[ny/2 + (int)x0*ny]) + 
+ //      ((Re(comp[ny/2+(int)x1*ny]) - Re(comp[ny/2+(int)x0*ny]))/(x1-x0))*
+ //      (x2 - x0);
 
  if (steps >= time_elast){  
  fpt2 = fopen("deltaC_vs_R.txt","a+");

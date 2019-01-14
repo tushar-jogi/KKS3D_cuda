@@ -57,7 +57,6 @@ int        initcount, initflag, iteration, interpolation, calc_uzero;
 double     alloycomp, noise_level; 
 //Grid size along x, timestep
 double     dx, dy, dz, dt, delta;
-double     *dx_d, *dy_d, *dz_d, *dt_d;
 int        elast_int, t_prof1, t_prof2, numsteps_prof1, numsteps_prof2,
            time_elast;
 
@@ -67,7 +66,6 @@ double     sim_time, total_time;
 
 //System dimensions along x and y
 int        nx, ny, nz, nx_half, ny_half, nz_half;
-int        *nx_d, *ny_d, *nz_d;
 
 int  *occupancy;
 //Bulk free energy coefficients
