@@ -207,6 +207,7 @@ __global__ void Update_comp_phi (cuDoubleComplex *comp_d,
   rhs.x = comp_d[idx].x + (dt_d)*(-1.0*(n[0]*gradphix_d[idx].y +
                                         n[1]*gradphiy_d[idx].y +
                                         n[2]*gradphiz_d[idx].y));
+
   rhs.y = comp_d[idx].y + (dt_d)*(n[0]*gradphix_d[idx].x +
                                   n[1]*gradphiy_d[idx].x + 
                                   n[2]*gradphiz_d[idx].x);
@@ -324,6 +325,7 @@ void Evolve(void)
   void      *t_storage = NULL;
   size_t    t_storage_bytes = 0;
   size_t    complex_size, double_size;
+
   cufftDoubleComplex    comp_at_corner;
 
   cub::DeviceReduce::Max(t_storage, t_storage_bytes, dummy, maxerr_d,
@@ -345,13 +347,11 @@ void Evolve(void)
   checkCudaErrors(cudaMemcpy(comp, comp_d, complex_size,
         cudaMemcpyDeviceToHost));
 
-
-if (elast_int == 0 || inhom == 1){
-  checkCudaErrors(cudaMalloc((void**)&gradphix_d, complex_size));
-  checkCudaErrors(cudaMalloc((void**)&gradphiy_d, complex_size));
-  checkCudaErrors(cudaMalloc((void**)&gradphiz_d, complex_size));
-}
-
+  if (elast_int == 0 || inhom == 1){
+    checkCudaErrors(cudaMalloc((void**)&gradphix_d, complex_size));
+    checkCudaErrors(cudaMalloc((void**)&gradphiy_d, complex_size));
+    checkCudaErrors(cudaMalloc((void**)&gradphiz_d, complex_size));
+  }
 
   if (inhom != 1){
 
@@ -393,6 +393,7 @@ if (elast_int == 0 || inhom == 1){
 
       checkCudaErrors(cudaMemcpy(comp, comp_d, complex_size,
             cudaMemcpyDeviceToHost));
+
       checkCudaErrors(cudaMemcpy(dfdphi, dfdphi_d, complex_size,
             cudaMemcpyDeviceToHost));
 
@@ -405,26 +406,32 @@ if (elast_int == 0 || inhom == 1){
    
     printf("Iteration No: %d\n",iteration);
 
-      //Finding elastic driving force in real space
+    //Finding elastic driving force in real space
     if (elast_int == 1 && count >= time_elast ){
 
-      if (inhom == 1){
-        if (count == initcount)
+      if (count == initcount)
         Calc_uzero();
+
+      if (inhom == 1){
+
         InhomElast();
+
       }
+
       else
-        HomElast();
+      HomElast();
+
     }
   
     //For homogeneous case gradphi is saved in ux_d, uy_d and uz_d.
     if (inhom == 1 || elast_int == 0){
+
       SaveReal<<< Gridsize, Blocksize >>>(dummy, comp_d, ny, nz);
 
+      //Gradphi is computed
       ComputeGradphi<<< Gridsize, Blocksize >>>(dkx, dky, dkz, 
-                                                nx, ny, nz, 
-                                                phi_d, gradphix_d, gradphiy_d, 
-                                                gradphiz_d);
+                                                nx, ny, nz, phi_d, 
+                                                gradphix_d, gradphiy_d, gradphiz_d);
 
       cufftExecZ2Z(plan, gradphix_d, gradphix_d, CUFFT_INVERSE);
       cufftExecZ2Z(plan, gradphiy_d, gradphiy_d, CUFFT_INVERSE);
@@ -433,18 +440,20 @@ if (elast_int == 0 || inhom == 1){
       Normalize<<<Gridsize,Blocksize >>>(gradphix_d, sizescale, ny, nz);
       Normalize<<<Gridsize,Blocksize >>>(gradphiy_d, sizescale, ny, nz);
       Normalize<<<Gridsize,Blocksize >>>(gradphiz_d, sizescale, ny, nz);
-    
+   
+      //dfdphi: driving force for phi evolution 
       ComputeDrivForce<<<Gridsize, Blocksize >>>(comp_d, dfdphi_d, 
-                                    gradphix_d, gradphiy_d, gradphiz_d, 
-                                    f0AVminv, f0BVminv, c_beta_eq, 
-                                    c_alpha_eq, diffusivity, 
-                                    w, ny, nz);
+                                                 gradphix_d, gradphiy_d, 
+                                                 gradphiz_d, f0AVminv, 
+                                                 f0BVminv, c_beta_eq, 
+                                                 c_alpha_eq, diffusivity, 
+                                                 w, ny, nz);
 
-      if (cufftExecZ2Z(plan,gradphix_d, gradphix_d,CUFFT_FORWARD) != CUFFT_SUCCESS)
+      if (cufftExecZ2Z(plan, gradphix_d, gradphix_d, CUFFT_FORWARD) != CUFFT_SUCCESS)
           printf("fft failed\n");
-      if (cufftExecZ2Z(plan,gradphiy_d, gradphiy_d,CUFFT_FORWARD) != CUFFT_SUCCESS)
+      if (cufftExecZ2Z(plan, gradphiy_d, gradphiy_d, CUFFT_FORWARD) != CUFFT_SUCCESS)
           printf("fft failed\n");
-      if (cufftExecZ2Z(plan,gradphiz_d, gradphiz_d,CUFFT_FORWARD) != CUFFT_SUCCESS)
+      if (cufftExecZ2Z(plan, gradphiz_d, gradphiz_d, CUFFT_FORWARD) != CUFFT_SUCCESS)
           printf("fft failed\n");
     
       cufftExecZ2Z(plan, comp_d,     comp_d, CUFFT_FORWARD);
@@ -454,18 +463,18 @@ if (elast_int == 0 || inhom == 1){
         cufftExecZ2Z(plan, dfeldphi_d, dfeldphi_d, CUFFT_FORWARD);
     
       Update_comp_phi<<< Gridsize, Blocksize >>>(comp_d, phi_d, dfdphi_d,
-                                   dfeldphi_d, gradphix_d, gradphiy_d, 
-                                   gradphiz_d, dkx, dky, dkz, dt,
-                                   diffusivity, kappa_phi, relax_coeff,
-                                   elast_int, nx, ny, nz);
+                                                 dfeldphi_d, gradphix_d, gradphiy_d, 
+                                                 gradphiz_d, dkx, dky, dkz, dt,
+                                                 diffusivity, kappa_phi, relax_coeff,
+                                                 elast_int, nx, ny, nz);
     }
+
     else 
     {
 	
       ComputeGradphi<<< Gridsize, Blocksize >>>(dkx, dky, dkz, 
-                                                nx, ny, nz, 
-                                                phi_d, ux_d, uy_d, 
-                                                uz_d);
+                                                nx, ny, nz, phi_d, 
+                                                ux_d, uy_d, uz_d);
 
       cufftExecZ2Z(plan, ux_d, ux_d, CUFFT_INVERSE);
       cufftExecZ2Z(plan, uy_d, uy_d, CUFFT_INVERSE);
@@ -476,10 +485,10 @@ if (elast_int == 0 || inhom == 1){
       Normalize<<<Gridsize,Blocksize >>>(uz_d, sizescale, ny, nz);
     
       ComputeDrivForce<<<Gridsize, Blocksize >>>(comp_d, dfdphi_d, 
-                                    ux_d, uy_d, uz_d, 
-                                    f0AVminv, f0BVminv, c_beta_eq, 
-                                    c_alpha_eq, diffusivity, 
-                                    w, ny, nz);
+                                                 ux_d, uy_d, uz_d, 
+                                                 f0AVminv, f0BVminv, 
+                                                 c_beta_eq, c_alpha_eq, 
+                                                 diffusivity, w, ny, nz);
 
       if (cufftExecZ2Z(plan, ux_d, ux_d, CUFFT_FORWARD) != CUFFT_SUCCESS)
           printf("fft of gradphix failed\n");
@@ -494,13 +503,15 @@ if (elast_int == 0 || inhom == 1){
       cufftExecZ2Z(plan, dfdphi_d, dfdphi_d, CUFFT_FORWARD);
     
       if (elast_int == 1 && count > time_elast)
-        cufftExecZ2Z(plan, dfeldphi_d, dfeldphi_d, CUFFT_FORWARD);
-    
+      cufftExecZ2Z(plan, dfeldphi_d, dfeldphi_d, CUFFT_FORWARD);
+   
+      //comp and phi for next step 
       Update_comp_phi<<< Gridsize, Blocksize >>>(comp_d, phi_d, dfdphi_d,
-                                   dfeldphi_d, ux_d, uy_d, 
-                                   uz_d, dkx, dky, dkz, dt,
-                                   diffusivity, kappa_phi, relax_coeff,
-                                   elast_int, nx, ny, nz);
+                                                 dfeldphi_d, ux_d, uy_d, 
+                                                 uz_d, dkx, dky, dkz, dt,
+                                                 diffusivity, kappa_phi, 
+                                                 relax_coeff, elast_int, 
+                                                 nx, ny, nz);
     } 
 
     cufftExecZ2Z(plan, comp_d,     comp_d, CUFFT_INVERSE);
@@ -513,18 +524,23 @@ if (elast_int == 0 || inhom == 1){
     Find_err_matrix<<< Gridsize, Blocksize >>>(dummy, comp_d, ny, nz);
 
     cudaMemcpy(&comp_at_corner,comp_d,sizeof(cufftDoubleComplex),
-                cudaMemcpyDeviceToHost);
+               cudaMemcpyDeviceToHost);
 
     cub::DeviceReduce::Max(t_storage, t_storage_bytes, dummy, maxerr_d, 
                            nx*ny*nz);       
+
     cudaDeviceSynchronize();
 
     checkCudaErrors(cudaMemcpy(&maxerror, maxerr_d, sizeof(double),
           cudaMemcpyDeviceToHost));
 
+    //printf("maxerror=%le\n", maxerror);
     if(maxerror <= Tolerance){
+
       printf("Microstructure converged\n");
+
       loop_condition = 0;      
+
     }
 
     sim_time = sim_time + dt;

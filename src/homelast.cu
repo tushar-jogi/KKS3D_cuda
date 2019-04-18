@@ -211,10 +211,10 @@ __global__ void Compute_dfeldphi_hom(cuDoubleComplex *ux_d,
                                      cuDoubleComplex *uz_d,
                                      cuDoubleComplex *dfdphi_d,
                                      cuDoubleComplex *dfeldphi_d, 
-                   double Chom11, double Chom12, double Chom44, 
-                   double *hom_strain_v0, double *hom_strain_v1, 
-                   double *hom_strain_v2, double epszero_d,
-                   int ny_d, int nz_d)
+                                    double Chom11, double Chom12, double Chom44, 
+                                    double *hom_strain_v0, double *hom_strain_v1, 
+                                    double *hom_strain_v2, double epszero_d,
+                                    int ny_d, int nz_d)
 {
 
    int i = threadIdx.x + blockDim.x*blockIdx.x;
@@ -225,11 +225,10 @@ __global__ void Compute_dfeldphi_hom(cuDoubleComplex *ux_d,
 
    double hphi, hphi_p, e_temp, str_v[6], estr[3], hstr[6];
  
-   e_temp = dfdphi_d[idx].x;
-   hphi = e_temp*e_temp*e_temp*(6.0*e_temp*e_temp -15.0*e_temp +10.0);
-   hphi_p = (30.0*e_temp*e_temp*(1.0-e_temp)*(1.0-e_temp));           
+   e_temp   = dfdphi_d[idx].x;
+   hphi     = e_temp*e_temp*e_temp*(6.0*e_temp*e_temp -15.0*e_temp +10.0);
+   hphi_p   = (30.0*e_temp*e_temp*(1.0-e_temp)*(1.0-e_temp));           
    
-
    str_v[0] = ux_d[idx].x;
    str_v[1] = uy_d[idx].x;
    str_v[2] = uz_d[idx].x;
@@ -242,7 +241,7 @@ __global__ void Compute_dfeldphi_hom(cuDoubleComplex *ux_d,
    hstr[1]  = *hom_strain_v1;
    hstr[2]  = *hom_strain_v2;
 
-   dfeldphi_d[idx].x = 
+   dfeldphi_d[idx].x = -1.0*(
                 Chom11*
                 (hstr[0]+str_v[0]-estr[0])*
                 (epszero_d)*hphi_p +
@@ -269,7 +268,7 @@ __global__ void Compute_dfeldphi_hom(cuDoubleComplex *ux_d,
                 (epszero_d)*hphi_p + 
                 Chom12*
                 (hstr[2]+str_v[2]-estr[2])*
-                (epszero_d)*hphi_p;
+                (epszero_d)*hphi_p);
 
    dfeldphi_d[idx].y = 0.0;  
 
@@ -303,9 +302,8 @@ void HomElast(void){
    cub::DeviceReduce::Sum(t_storage, t_storage_bytes, dummy,
                           hom_strain_v0, nx*ny*nz);
 
- 
    //save eigen strain ux_d, uy_d and uz_d 
-   Compute_eigstr_hom<<<Gridsize,Blocksize>>>(dummy,dfdphi_d,epszero,ny,nz);
+   Compute_eigstr_hom<<<Gridsize,Blocksize>>>(dummy, dfdphi_d, epszero, ny, nz);
 
    cub::DeviceReduce::Sum(t_storage, t_storage_bytes, dummy,
                           hom_strain_v0, nx*ny*nz);
@@ -324,8 +322,7 @@ void HomElast(void){
 
    //Save eigen stress in ux_d, uy_d and uz_d 
    Compute_eigsts_hom<<<Gridsize,Blocksize >>>(ux_d, uy_d, uz_d, 
-                                               dfdphi_d, 
-                                               Chom11, Chom12, Chom44, 
+                                               dfdphi_d, Chom11, Chom12, Chom44, 
                                                epszero, ny, nz);
 
 
@@ -340,10 +337,9 @@ void HomElast(void){
    *                 Zeroth order displacement              *
    **********************************************************/ 
    Compute_uzero<<< Gridsize, Blocksize >>>(nx, ny, nz, 
-                          ux_d, uy_d, uz_d, dkx, 
-                          dky, dkz, ux_d, uy_d, uz_d,
-                          Chom11, Chom12, Chom44);
-
+                                            ux_d, uy_d, uz_d, dkx, 
+                                            dky, dkz, ux_d, uy_d, uz_d,
+                                            Chom11, Chom12, Chom44);
    
    Compute_perstr<<<Gridsize, Blocksize>>>(nx, ny, nz, ux_d, uy_d, uz_d, dkx, dky, dkz);
 
@@ -356,11 +352,11 @@ void HomElast(void){
    Normalize<<<Gridsize,Blocksize >>>(uz_d, sizescale, ny, nz); 
 
    //Saving elastic driving force in dummy
-   Compute_dfeldphi_hom<<< Gridsize, Blocksize>>>
-                      (ux_d, uy_d, uz_d, dfdphi_d, ux_d, Chom11, Chom12,
-                       Chom44, hom_strain_v0, hom_strain_v1, hom_strain_v2, 
-                       epszero, ny, nz);
-
+   Compute_dfeldphi_hom<<< Gridsize, Blocksize>>>(ux_d, uy_d, uz_d, 
+                                                  dfdphi_d, dfeldphi_d, 
+                                                  Chom11, Chom12, Chom44, 
+                                                  hom_strain_v0, hom_strain_v1, 
+                                                  hom_strain_v2, epszero, ny, nz);
    cudaFree(hom_strain_v0);
    cudaFree(hom_strain_v1);
    cudaFree(hom_strain_v2);

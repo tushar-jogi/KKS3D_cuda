@@ -3,7 +3,7 @@ NVCC = nvcc
 COMPOPS = -Xptxas -O3 
 #COMPOPS = -Xptxas -g  
 #COMPOPS =   
-ARCH = -arch=sm_60 
+ARCH = -arch=sm_70 
 LIBS =  -lcufft -lcuda -lcudart 
 INCS =  -I/usr/local/cuda-9.1/samples/common/inc   
 HEADERS = include/binary.h
