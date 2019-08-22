@@ -35,6 +35,17 @@ __global__ void Compute_eigstr_hom(double *eigstr0,
 
 }
 
+__global__ void Real_part_str(double *dummy, cuDoubleComplex *ux_d, int ny, int nz)
+{
+
+  int i = threadIdx.x + blockDim.x*blockIdx.x;
+  int j = threadIdx.y + blockDim.y*blockIdx.y;
+  int k = threadIdx.z + blockDim.z*blockIdx.z;
+
+  int idx = k + (nz)*(j + i*(ny));
+
+  dummy[idx] = ux_d[idx].x;
+}
 __global__ void Compute_Sij_hom(double *Cavg11, double *Cavg12, double *Cavg44,
                             double *S11_d, double *S12_d, double *S44_d)
 {
@@ -275,15 +286,17 @@ __global__ void Compute_dfeldphi_hom(cuDoubleComplex *ux_d,
 } 
 
 __global__ void Find_hom_strain(double *hom_strain_v0, double *hom_strain_v1, 
-                                double *hom_strain_v2, double *sigappl_v_d, 
-                                double *S11_d, double *S12_d, double *S44_d)
+                                double *hom_strain_v2, double *avgstr_v0,
+                                double *avgstr_v1, double *avgstr_v2, 
+                                double *sigappl_v_d, 
+                                double *S11_d, double *S12_d)
 {
 	*hom_strain_v0 += (*S11_d)*(sigappl_v_d[0])+ 
-                          (*S12_d)*(sigappl_v_d[1] + sigappl_v_d[2]);
+                          (*S12_d)*(sigappl_v_d[1] + sigappl_v_d[2]) + *avgstr_v0;
 	*hom_strain_v1 += (*S11_d)*(sigappl_v_d[1])+ 
-                          (*S12_d)*(sigappl_v_d[0] + sigappl_v_d[2]);
+                          (*S12_d)*(sigappl_v_d[0] + sigappl_v_d[2]) + *avgstr_v1;
 	*hom_strain_v2 += (*S11_d)*(sigappl_v_d[2])+ 
-                          (*S12_d)*(sigappl_v_d[0] + sigappl_v_d[1]);
+                          (*S12_d)*(sigappl_v_d[0] + sigappl_v_d[1]) + *avgstr_v2;
 } 
 
 void HomElast(void){
@@ -292,33 +305,38 @@ void HomElast(void){
    size_t           t_storage_bytes = 0;
    //double           *dummy;
    double           *hom_strain_v0, *hom_strain_v1, *hom_strain_v2;
+   double           *avgstr_v0, *avgstr_v1, *avgstr_v2;
    //cublasStatus_t    stat;
 
    checkCudaErrors(cudaMalloc((void**)&hom_strain_v0, sizeof(double)));
    checkCudaErrors(cudaMalloc((void**)&hom_strain_v1, sizeof(double)));
    checkCudaErrors(cudaMalloc((void**)&hom_strain_v2, sizeof(double)));
+   checkCudaErrors(cudaMalloc((void**)&avgstr_v0, sizeof(double)));
+   checkCudaErrors(cudaMalloc((void**)&avgstr_v1, sizeof(double)));
+   checkCudaErrors(cudaMalloc((void**)&avgstr_v2, sizeof(double)));
    //checkCudaErrors(cudaMalloc((void**)&dummy, nx*ny*nz*sizeof(double)));
 
    cub::DeviceReduce::Sum(t_storage, t_storage_bytes, dummy,
                           hom_strain_v0, nx*ny*nz);
 
-   //save eigen strain ux_d, uy_d and uz_d 
+   //save eigen strain field in dummy ( only eig11 ) 
    Compute_eigstr_hom<<<Gridsize,Blocksize>>>(dummy, dfdphi_d, epszero, ny, nz);
 
+   //Sum of the eigen strain field
    cub::DeviceReduce::Sum(t_storage, t_storage_bytes, dummy,
                           hom_strain_v0, nx*ny*nz);
+
    //cudaFree(dummy);
    checkCudaErrors(cudaMemcpy(hom_strain_v1, hom_strain_v0,
              sizeof(double), cudaMemcpyDeviceToDevice));
 
    checkCudaErrors(cudaMemcpy(hom_strain_v2, hom_strain_v0,
              sizeof(double), cudaMemcpyDeviceToDevice));
-   
+  
+   //volume average of sum of the eigen strain field 
    Find_volumeAvg_eigstr<<<1,1>>>(hom_strain_v0, hom_strain_v1, hom_strain_v2, 
                                   sizescale);
 
-   Find_hom_strain<<<1,1>>>(hom_strain_v0, hom_strain_v1, hom_strain_v2, 
-                            sigappl_v_d, S11_d, S12_d, S44_d); 
 
    //Save eigen stress in ux_d, uy_d and uz_d 
    Compute_eigsts_hom<<<Gridsize,Blocksize >>>(ux_d, uy_d, uz_d, 
@@ -343,6 +361,7 @@ void HomElast(void){
    
    Compute_perstr<<<Gridsize, Blocksize>>>(nx, ny, nz, ux_d, uy_d, uz_d, dkx, dky, dkz);
 
+   
    cufftExecZ2Z(plan, ux_d, ux_d, CUFFT_INVERSE);
    cufftExecZ2Z(plan, uy_d, uy_d, CUFFT_INVERSE);
    cufftExecZ2Z(plan, uz_d, uz_d, CUFFT_INVERSE);
@@ -351,6 +370,29 @@ void HomElast(void){
    Normalize<<<Gridsize,Blocksize >>>(uy_d, sizescale, ny, nz); 
    Normalize<<<Gridsize,Blocksize >>>(uz_d, sizescale, ny, nz); 
 
+   //saving real part of periodic strain (e11) in dummy
+   Real_part_str<<<Gridsize,Blocksize>>>(dummy, ux_d, ny, nz);
+   //Average periodic strain (e11) 
+   cub::DeviceReduce::Sum(t_storage, t_storage_bytes, dummy,
+                          avgstr_v0, nx*ny*nz);
+
+   //saving real part of periodic strain (e22) in dummy
+   Real_part_str<<<Gridsize,Blocksize>>>(dummy, uy_d, ny, nz);
+   //Average periodic strain (e22) 
+   cub::DeviceReduce::Sum(t_storage, t_storage_bytes, dummy,
+                          avgstr_v1, nx*ny*nz);
+
+   //saving real part of periodic strain (e33) in dummy
+   Real_part_str<<<Gridsize,Blocksize>>>(dummy, uz_d, ny, nz);
+   //Average periodic strain (e33) 
+   cub::DeviceReduce::Sum(t_storage, t_storage_bytes, dummy,
+                          avgstr_v2, nx*ny*nz);
+
+   //adding periodic strain and strain due to applied stress 
+   Find_hom_strain<<<1,1>>>(hom_strain_v0, hom_strain_v1, hom_strain_v2,
+                            avgstr_v0, avgstr_v1, avgstr_v2, 
+                            sigappl_v_d, S11_d, S12_d); 
+   
    //Saving elastic driving force in dummy
    Compute_dfeldphi_hom<<< Gridsize, Blocksize>>>(ux_d, uy_d, uz_d, 
                                                   dfdphi_d, dfeldphi_d, 
@@ -360,5 +402,8 @@ void HomElast(void){
    cudaFree(hom_strain_v0);
    cudaFree(hom_strain_v1);
    cudaFree(hom_strain_v2);
+   cudaFree(avgstr_v0);
+   cudaFree(avgstr_v1);
+   cudaFree(avgstr_v2);
 
 }
